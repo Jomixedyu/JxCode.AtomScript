@@ -15,6 +15,13 @@
 * String （使用C++中的std::wstring储存）
 * UserPtr（一个整数Id，由外部解释器来绑定对象）
 
+## 预处理器
+使用预处理可以使语言更方便更灵活，但是为了避免出现错误无法准确定位等维护上的麻烦，仅提供单行字符替换等功能，
+```
+#replace source target
+```
+文档的文本替换预处理（不是c的Token替换而是纯文本替换），参数1替换参数2，用空格分隔
+
 ## 基础语法
 使用基础关键字
 ```
@@ -44,7 +51,7 @@ call AtomLang::Sys.obj.Print: "inst helloworld"
 ```
 ->IsZero__end
 ::IsZero
-    ? IsZero__parm1 != 0 else ->IsZero__logic1
+    ? IsZero__parm1 == 0 else->IsZero__logic1
         $IsZero__return = true
         ->var IsZero__back
     ::IsZero__logic1
