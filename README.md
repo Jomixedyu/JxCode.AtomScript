@@ -66,51 +66,55 @@ $ret = IsZero__return
 ```
 
 ### 执行一个文件
-jumpfile "atomscript"  
+```jumpfile "atomscript"```   
 符号  
-=>"atomscript"
+```=>"atomscript"```
 
 ### 设置一个变量
-set a = "helloworld"  
+```set a = "helloworld"```  
 符号  
-$a = "helloworld"
+```$a = "helloworld"```
 
 ### 删除一个变量
-del a  
+```del a```  
 符号  
--a
+```-a```
 
 ### 声明一个标签
-label start  
+```label start```  
 符号  
-::start  
+```::start```  
 
 ### 跳到一个标签  
-goto start  
+```goto start```  
 符号  
-->start  
+```->start```  
 
 ### 跳转至变量中的标签
+```
 set target = "start"
 goto var target
+```
 符号  
+```
 $target = "start"
 ->var target
+```
 
 ### 清除所有子变量
 对start执行clear后，删除变量池中名字以 start__ 开头的所有变量  
-clear start  
+```clear start```  
 符号  
-~start
+```~start```
 
 ### 执行函数
 ::在函数调用中为域运算符，一般指定为类型名称空间的路径，.是子对象运算符  
-call Atom::Sys.Print: "hello world"  
+```call Atom::Sys.Print: "hello world"```  
 符号  
-@Atom::Sys.Print: "hello world"
+```@Atom::Sys.Print: "hello world"```
 
 ### 逻辑
 如果表达式运算成立，则向下继续执行，否则执行goto  
-if a == 0 else goto start  
+```if a == 0 else goto start```  
 符号  
-? a == 0 else->start
+```? a == 0 else->start```
