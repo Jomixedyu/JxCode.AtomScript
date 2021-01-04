@@ -401,6 +401,19 @@ namespace jxcode
             mp[L":"] = TokenType::Colon;
             mp[L","] = TokenType::Comma;
             mp[L"."] = TokenType::Dot;
+            mp[L">"] = TokenType::GreaterThan;
+            mp[L"<"] = TokenType::LessThan;
+
+            mp[L"~"] = TokenType::Tilde;
+            mp[L"!"] = TokenType::Exclamatory;
+            mp[L"@"] = TokenType::At;
+            mp[L"#"] = TokenType::Pound;
+            mp[L"$"] = TokenType::Doller;
+            mp[L"%"] = TokenType::Precent;
+
+            mp[L"->"] = TokenType::SingleArrow;
+            mp[L"=>"] = TokenType::DoubleArrow;
+
             return mp;
         }
 

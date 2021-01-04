@@ -10,20 +10,19 @@ namespace jxcode::atomscript
 
     namespace OpCode {
         OpCode_t Unknow = L"Unknow";
-        OpCode_t Call = L"Call";
-        OpCode_t Jump = L"Jump";
-        OpCode_t Label = L"Label";
-        OpCode_t Goto = L"Goto";
-        OpCode_t If = L"If";
-        OpCode_t Set = L"Set";
-        OpCode_t Del = L"Del";
-        OpCode_t ClearSubVar = L"Clear";
-        OpCode_t JumpFile = L"JumpFile";
+        OpCode_t Call = L"call";
+        OpCode_t Label = L"label";
+        OpCode_t Goto = L"goto";
+        OpCode_t If = L"if";
+        OpCode_t Set = L"set";
+        OpCode_t Del = L"del";
+        OpCode_t ClearSubVar = L"clear";
+        OpCode_t JumpFile = L"jumpfile";
     }
     OpCommand::OpCommand() : code(OpCode::Unknow), op_token(Token()), targets(vector<Token>()) {
 
     }
-    OpCommand::OpCommand(const OpCode_t& code, const lexer::Token& optoken, const vector<Token>& targets) 
+    OpCommand::OpCommand(const OpCode_t& code, const lexer::Token& optoken, const vector<Token>& targets)
         : code(code), op_token(optoken), targets(targets)
     {
 
@@ -42,29 +41,37 @@ namespace jxcode::atomscript
                 if (token.token_type == TokenType::LF) {
                     continue;
                 }
-                else if (*token.value == L"goto") {
+                else if (*token.value == OpCode::Call || token.token_type == TokenType::At) {
+                    // @
+                    cmd.code = OpCode::Call;
+                }
+                else if (*token.value == OpCode::Goto || token.token_type == TokenType::SingleArrow) {
+                    // ->
                     cmd.code = OpCode::Goto;
                 }
-                else if (*token.value == L"if") {
+                else if (*token.value == OpCode::If || token.token_type == TokenType::Question) {
+                    // ?
                     cmd.code = OpCode::If;
                 }
-                else if (*token.value == L"set") {
+                else if (*token.value == OpCode::Set || token.token_type == TokenType::Doller) {
                     cmd.code = OpCode::Set;
+                    // $
                 }
-                else if (*token.value == L"clear") {
+                else if (*token.value == OpCode::ClearSubVar || token.token_type == TokenType::Tilde) {
+                    // ~
                     cmd.code = OpCode::ClearSubVar;
                 }
-                else if (*token.value == L"del") {
+                else if (*token.value == OpCode::Del || token.token_type == TokenType::Division) {
+                    // -
                     cmd.code = OpCode::Del;
                 }
-                else if (*token.value == L"jumpfile") {
+                else if (*token.value == OpCode::JumpFile || token.token_type == TokenType::DoubleArrow) {
+                    // =>
                     cmd.code = OpCode::JumpFile;
                 }
-                else if (token.token_type == TokenType::DoubleColon) {
+                else if (*token.value == OpCode::Label || token.token_type == TokenType::DoubleColon) {
+                    // ::
                     cmd.code = OpCode::Label;
-                }
-                else if(*token.value == L"call") {
-                    cmd.code = OpCode::Call;
                 }
 
                 cmd.op_token = token;

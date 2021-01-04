@@ -29,8 +29,18 @@ namespace jxcode::lexer
         TokenType_t DoubleColon = L"DoubleColon";
         TokenType_t Comma = L"Comma";
         TokenType_t Dot = L"Dot";
-    }
-
+        TokenType_t GreaterThan = L"GreaterThan";
+        TokenType_t LessThan = L"LessThan";
+        TokenType_t SingleArrow = L"SingleArrow";
+        TokenType_t DoubleArrow = L"DoubleArrow";
+        TokenType_t Tilde = L"Tilde";
+        TokenType_t Exclamatory = L"Exclamatory";
+        TokenType_t At = L"At";
+        TokenType_t Pound = L"Pound";
+        TokenType_t Doller = L"Doller";
+        TokenType_t Precent = L"Precent";
+    }               
+    
     std::wstring Token::to_string() const {
         std::wstringstream ss;
         ss << L"TokenType: ";

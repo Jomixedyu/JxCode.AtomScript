@@ -2,7 +2,7 @@
 #include <string>
 #include <memory>
 
-namespace jxcode::lexer 
+namespace jxcode::lexer
 {
     using TokenType_t = const wchar_t*;
     namespace TokenType
@@ -31,6 +31,10 @@ namespace jxcode::lexer
         extern TokenType_t DoubleColon;
         extern TokenType_t Comma;
         extern TokenType_t Dot;
+        extern TokenType_t GreaterThan;
+        extern TokenType_t LessThan;
+        extern TokenType_t SingleArrow;
+        extern TokenType_t DoubleArrow;
     }
 
     struct Token
