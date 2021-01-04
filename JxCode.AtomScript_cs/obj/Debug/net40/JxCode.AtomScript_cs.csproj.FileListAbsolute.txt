@@ -1,0 +1,7 @@
+E:\JxCode.AtomScript\JxCode.AtomScript_cs\bin\Debug\net40\JxCode.AtomScript_cs.dll
+E:\JxCode.AtomScript\JxCode.AtomScript_cs\bin\Debug\net40\JxCode.AtomScript_cs.pdb
+E:\JxCode.AtomScript\JxCode.AtomScript_cs\obj\Debug\net40\JxCode.AtomScript_cs.AssemblyInfoInputs.cache
+E:\JxCode.AtomScript\JxCode.AtomScript_cs\obj\Debug\net40\JxCode.AtomScript_cs.AssemblyInfo.cs
+E:\JxCode.AtomScript\JxCode.AtomScript_cs\obj\Debug\net40\JxCode.AtomScript_cs.csproj.CoreCompileInputs.cache
+E:\JxCode.AtomScript\JxCode.AtomScript_cs\obj\Debug\net40\JxCode.AtomScript_cs.dll
+E:\JxCode.AtomScript\JxCode.AtomScript_cs\obj\Debug\net40\JxCode.AtomScript_cs.pdb

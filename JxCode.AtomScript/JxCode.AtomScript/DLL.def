@@ -1,0 +1,12 @@
+
+LIBERARY Jxatomscript
+
+EXPORTS
+GetErrorMessage
+Initialize
+Terminate
+ExecuteCode
+Next
+SerializeState
+DeserializeState
+GetLibVersion
