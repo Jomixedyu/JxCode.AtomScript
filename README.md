@@ -16,7 +16,7 @@
 * UserPtr（一个整数Id，由外部解释器来绑定对象）
 
 ## 基础语法
-
+使用基础关键字
 ```
 goto IsZero__end
 ::IsZero
@@ -39,6 +39,30 @@ clear IsZero
 call AtomLang::Sys.Print: "helloworld"
 //inst
 call AtomLang::Sys.obj.Print: "inst helloworld"
+```
+也可以使用符号
+```
+->IsZero__end
+::IsZero
+    ? IsZero__parm1 != 0 else ->IsZero__logic1
+        $IsZero__return = true
+        ->var IsZero__back
+    ::IsZero__logic1
+        $IsZero__return = false
+        ->var IsZero__back
+::IsZero__end
+
+$IsZero__back = "IsZeroCall1"
+$IsZero__param1 = 3
+->IsZero
+::IsZeroCall1
+$ret = IsZero__return
+~IsZero
+
+//static
+@AtomLang::Sys.Print: "helloworld"
+//inst
+@AtomLang::Sys.obj.Print: "inst helloworld"
 ```
 
 ### 执行一个文件
@@ -89,4 +113,4 @@ call Atom::Sys.Print: "hello world"
 如果表达式运算成立，则向下继续执行，否则执行goto  
 if a == 0 else goto start  
 符号  
-? a == 0 else @start
+? a == 0 else->start
