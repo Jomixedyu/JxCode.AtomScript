@@ -1,10 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace AtomLang
+namespace JxCode.AtomLang
 {
     public class InterpreterException : Exception
     {
@@ -53,7 +54,7 @@ namespace AtomLang
         private delegate int FunctionCallBack(int id, TokenGroup doman, TokenGroup path, TokenGroup param);
         private delegate void ErrorInfoCallBack([MarshalAs(UnmanagedType.LPWStr)] string errorInfo);
 
-        const string DLL_NAME = @"E:\JxCCode.Lang\x64\DLLDebug\JxCCode.Lang.dll";
+        const string DLL_NAME = @"E:\JxCode.AtomScript\JxCode.AtomScript\x64\DLLDebug\JxCode.AtomScript.dll";
 
         [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
         private extern static void GetErrorMessage(int id, StringBuilder sb);
@@ -66,6 +67,8 @@ namespace AtomLang
         [DllImport(DLL_NAME)]
         private extern static void Terminate(int id);
         [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
+        private extern static int ResetState(int id);
+        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
         private extern static int ExecuteCode(int id, string code);
         [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
         private extern static int Next(int id);
@@ -74,13 +77,17 @@ namespace AtomLang
         [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
         private extern static int DeserializeState(int id, string deser_str);
         [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
+        private extern static int GetStateStatus(int id, ref int exeptr, ref int var_counts);
+        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
+        private extern static int ReleaseSerializeStr(StringBuilder str);
+        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
         private extern static void GetLibVersion(StringBuilder str);
+
 
         private int id;
         private Func<string, string> loadfile;
 
         private Dictionary<int, object> insts = new Dictionary<int, object>();
-
 
         private object GetVar(int id)
         {
@@ -95,6 +102,119 @@ namespace AtomLang
             this.loadfile = loadfile;
             Initialize(OnLoadFile, OnFuncall, OnError, ref _id);
             this.id = _id;
+        }
+        private MethodInfo GetSerializeMethodInfo(object obj)
+        {
+            if (obj == null)
+            {
+                return null;
+            }
+            Type type = obj.GetType();
+            try
+            {
+                MethodInfo methodInfo = type.GetMethod("Serialize");
+                var parms = methodInfo.GetParameters();
+                //有且只能有一个Stream类型形参
+                if (parms.Length != 1 || parms[0].ParameterType != typeof(Stream))
+                {
+                    return null;
+                }
+                return methodInfo;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+        private MethodInfo GetDeserializeMethodInfo(string typePath)
+        {
+            Type type = Type.GetType(typePath);
+            if(type == null)
+            {
+                return null;
+            }
+            try
+            {
+                MethodInfo mi = type.GetMethod("Deserialize");
+                if(mi == null)
+                {
+                    return null;
+                }
+                var parms = mi.GetParameters();
+                if(parms.Length != 1 || parms[0].ParameterType != typeof(Stream))
+                {
+                    return null;
+                }
+                return mi;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        public void Serialize(Stream stream)
+        {
+            StringBuilder sb = new StringBuilder(1024);
+            SerializeState(this.id, sb);
+            string c_ser_str = sb.ToString();
+
+            BinaryWriter bw = new BinaryWriter(stream);
+
+            bw.Write(c_ser_str);
+            bw.Write(this.insts.Count);
+            foreach (var item in this.insts)
+            {
+                bw.Write(item.Key);
+                bw.Write(item.Value.GetType().FullName);
+                MethodInfo mi = GetSerializeMethodInfo(item.Value);
+                if (mi == null)
+                {
+                    //WARNING: Unable to complete serialization
+                    //continue;
+                    bw.Write(0);
+                }
+                else
+                {
+                    MemoryStream ms = new MemoryStream();
+                    mi.Invoke(item.Value, new object[] { ms });
+                    var buf = ms.ToArray();
+                    bw.Write(buf.Length);
+                    bw.Write(buf);
+                    ms.Close();
+                }
+            }
+            bw.Flush();
+        }
+        public void Deserialize(Stream stream)
+        {
+            BinaryReader br = new BinaryReader(stream);
+            DeserializeState(this.id, br.ReadString());
+
+            int varCount = br.ReadInt32();
+            for (int i = 0; i < varCount; i++)
+            {
+                //name, Type, value
+                int user_id = br.ReadInt32();
+                int buf_length = br.ReadInt32();
+
+                MemoryStream ms = new MemoryStream();
+                if (buf_length != 0)
+                {
+                    ms.Write(br.ReadBytes(buf_length), 0, buf_length);
+                    ms.Position = 0;
+                }
+
+                MethodInfo mi = GetDeserializeMethodInfo(br.ReadString());
+                object v = mi.Invoke(null, new object[] { ms });
+                ms.Close();
+                this.insts.Add(user_id, v);
+            }
+        }
+        private string GetExceptionInfo(TokenInfo info, string content)
+        {
+            return string.Format("{0}, value: {1}, line: {2}, pos: {3}",
+                content, info.value, info.line, info.position);
         }
 
         private string OnLoadFile(string path)
@@ -117,6 +237,7 @@ namespace AtomLang
             }
 
             //获取最后一个方法名
+            TokenInfo methodNameToken = path.tokens[path.size - 1];
             string method = (path.tokens[path.size - 1].value);
 
             string[] @params = new string[param.size];
@@ -146,23 +267,24 @@ namespace AtomLang
                 type = Type.GetType(domainPath);
                 if (type == null)
                 {
-                    throw new InterpreterException(
-                        string.Format("未找到域: {0},  line: {1}, position: {2}",
-                        domainPath, domain.tokens[0].line, domain.tokens[0].position));
+                    throw new InterpreterException(GetExceptionInfo(domain.tokens[0], "未找到域"));
                 }
                 for (int i = 0; i < paths.Length; i++)
                 {
                     inst = GetSubObject(inst, inst == null ? type : inst.GetType(), paths[i]);
                     if (inst == null)
                     {
-                        throw new InterpreterException(
-                            string.Format("未找到对象: {0},  line: {1}, position: {2}",
-                            path.tokens[i].value, path.tokens[i].line, path.tokens[i].position));
+                        throw new InterpreterException(GetExceptionInfo(path.tokens[i], "未找到对象"));
                     }
                     type = inst.GetType();
                 }
             }
             methodInfo = type.GetMethod(method);
+
+            if (methodInfo == null)
+            {
+                throw new InterpreterException(GetExceptionInfo(methodNameToken, "未找到方法"));
+            }
 
             ParameterInfo[] paramTypes = methodInfo.GetParameters();
             object[] _params = new object[paramTypes.Length];
@@ -229,7 +351,13 @@ namespace AtomLang
 
             return this;
         }
-
+        public int GetVariableCount()
+        {
+            int exeptr = 0;
+            int var_count = 0;
+            GetStateStatus(this.id, ref exeptr, ref var_count);
+            return var_count;
+        }
         private bool disaposed = false;
         public void Dispose()
         {

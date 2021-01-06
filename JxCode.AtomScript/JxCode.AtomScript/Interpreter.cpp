@@ -1,11 +1,13 @@
 #include <stdexcept>
 #include "Interpreter.h"
 #include "Lexer.h"
+#include <regex>
+#include <codecvt>
 
 namespace jxcode::atomscript
 {
 
-    using std::wstring;
+    using namespace std;
     using namespace lexer;
 
     wstring InterpreterException::ParserException = wstring(L"ParserException");
@@ -64,7 +66,7 @@ namespace jxcode::atomscript
         }
     }
 
-    void Interpreter::SetVar(const wstring& name, const intptr_t& user_id)
+    void Interpreter::SetVar(const wstring& name, const int& user_id)
     {
         Variable* var = this->GetVar(name);
         if (var == nullptr) {
@@ -72,6 +74,17 @@ namespace jxcode::atomscript
         }
         else {
             this->variables_[name]->SetUserVarId(user_id);
+        }
+    }
+
+    void Interpreter::SetVar(const wstring& name, const Variable& _var)
+    {
+        Variable* var = this->GetVar(name);
+        if (var == nullptr) {
+            this->variables_[name] = new Variable(_var);
+        }
+        else {
+            *this->variables_[name] = _var;
         }
     }
 
@@ -137,7 +150,20 @@ namespace jxcode::atomscript
         }
         else if (cmd.code == OpCode::Set) {
             //暂时不用表达式，只使用一个值
-            this->SetVar(*cmd.targets[0].value, *cmd.targets[2].value);
+
+            wstring& varname = *cmd.targets[0].value;
+
+            if (cmd.targets[2].token_type == TokenType::Number) {
+                this->SetVar(varname, std::stof(*cmd.targets[2].value));
+            }
+            else if (cmd.targets[2].token_type == TokenType::String)
+            {
+                this->SetVar(varname, *cmd.targets[2].value);
+            }
+            else if (cmd.targets[2].token_type == TokenType::Ident) {
+                auto v = this->GetVar(*cmd.targets[2].value);
+                this->SetVar(varname, *v);
+            }
         }
         else if (cmd.code == OpCode::Del) {
             this->DelVar(*cmd.targets[0].value);
@@ -247,6 +273,62 @@ namespace jxcode::atomscript
         return true;
     }
 
+    /*
+    static void str_replace(wstring& str, const wstring& src, const wstring& n)
+    {
+        int index = 0;
+        while ((index = str.find(src, index)) != str.npos) {
+            str.replace(index, src.size(), n);
+            index += n.size();
+        }
+    }
+    */
+    /*
+    static wstring pre_process(const wstring& _str)
+    {
+        if (_str.size() == 0) {
+            return _str;
+        }
+        bool is_pre_def = false;
+        bool is_newline = true;
+        wstring replace_def = L"#replace";
+
+        wstring str = _str;
+
+        for (size_t i = 0; i < str.size(); i++)
+        {
+            if (is_newline) {
+                if (str[i] == L'#')
+                {
+                    size_t index = i;
+                    while (index != str.size() - 1 && str[index] != L'\n') {
+                        //end
+                        index++;
+                    }
+                    wstring line_content = str.substr(i, index - i);
+                    if (line_content.compare(0, replace_def.size(), replace_def) == 0) {
+                        //#replace
+                        wstring cmd_content = line_content.substr(replace_def.size() + 1);
+                        size_t space_pos = cmd_content.find(L' ');
+                        wstring left = cmd_content.substr(0, space_pos);
+                        wstring right = cmd_content.substr(space_pos + 1);
+                        //删除预处理代码
+                        str.replace(i, index - i, L"");
+                        //开始替换
+                        str_replace(str, left, right);
+                    }
+                }
+                is_newline = false;
+            }
+
+            if (str[i] == L'\n') {
+                is_newline = true;
+            }
+        }
+        return str;
+    }
+    */
+
     Interpreter* Interpreter::ExecuteCode(const wstring& code)
     {
         this->ResetCodeState();
@@ -297,13 +379,50 @@ namespace jxcode::atomscript
         return this;
     }
 
-    std::wstring Interpreter::Serialize()
+    void Interpreter::Reset()
     {
-        return std::wstring();
+        this->ResetCodeState();
+        decltype(this->variables_)().swap(this->variables_);
     }
 
-    void Interpreter::Deserialize(const wstring& text)
+    wstring Interpreter::Serialize()
     {
+        size_t size = 0;
+        wstring str;
+        for (auto& item : this->variables_) {
+            str += item.first;
+            str += 3;
+            str += item.second->GetSerializeData();
+            str += 4;
+        }
+        return str;
+    }
+
+    void Interpreter::Deserialize(const wstring& _text)
+    {
+        wstring& text = const_cast<wstring&>(_text);
+        if (text.size() == 0) {
+            return;
+        }
+
+        size_t head = 0;
+        size_t tail = 0;
+        while (true) {
+            if (text.size() == tail) {
+                break;
+            }
+            if (text[tail] == 4) {
+                wstring str = text.substr(head, tail - head);
+                auto spl_pos = str.find((wchar_t)3);
+                wstring name = str.substr(0, spl_pos);
+                wstring var_str = str.substr(spl_pos + 1);
+                auto var = Variable::DeserializeData(var_str);
+                this->variables_[name] = new Variable(var);
+                head = tail + 1;
+            }
+            tail++;
+        }
+
     }
 
     Variable::Variable()
@@ -321,7 +440,7 @@ namespace jxcode::atomscript
         this->SetString(str);
     }
 
-    Variable::Variable(const intptr_t& user_type_ptr) : Variable()
+    Variable::Variable(const int& user_type_ptr) : Variable()
     {
         this->SetUserVarId(user_type_ptr);
     }
@@ -338,10 +457,47 @@ namespace jxcode::atomscript
         this->type = VariableType::String;
     }
 
-    void Variable::SetUserVarId(const intptr_t& user_type_ptr)
+    void Variable::SetUserVarId(const int& user_type_ptr)
     {
         this->user_type_ptr = user_type_ptr;
         this->type = VariableType::UserVarId;
+    }
+
+    wstring Variable::GetSerializeData()
+    {
+        wstring str;
+        str += (wchar_t)(int)this->type + 48;
+        switch (this->type)
+        {
+            case VariableType::Numeric:
+                str += to_wstring(this->num);
+                break;
+            case VariableType::UserVarId:
+                str += to_wstring(this->user_type_ptr);
+                break;
+            case VariableType::String:
+                str += this->str;
+                break;
+            default:
+                break;
+        }
+        return str;
+    }
+
+    Variable Variable::DeserializeData(const wstring& _data)
+    {
+        Variable var;
+        wstring& data = const_cast<wstring&>(_data);
+        if (data[0] == (int)VariableType::Numeric + 48) {
+            var.SetNumber(stof(data.substr(1)));
+        }
+        else if (data[0] == (int)VariableType::UserVarId + 48) {
+            var.SetUserVarId(stoi(data.substr(1)));
+        }
+        else if (data[0] == (int)VariableType::String + 48) {
+            var.SetString(data.substr(1));
+        }
+        return var;
     }
 
 }

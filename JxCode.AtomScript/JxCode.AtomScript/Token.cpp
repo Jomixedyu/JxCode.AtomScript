@@ -39,6 +39,7 @@ namespace jxcode::lexer
         TokenType_t Pound = L"Pound";
         TokenType_t Doller = L"Doller";
         TokenType_t Precent = L"Precent";
+        TokenType_t Question = L"Question";
     }               
     
     std::wstring Token::to_string() const {

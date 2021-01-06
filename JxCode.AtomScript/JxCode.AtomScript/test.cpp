@@ -15,10 +15,13 @@ static std::wstring readAllText(const std::wstring& path) {
     if (!ifs.is_open()) {
         throw std::invalid_argument("Unable to open file");
     }
-    ss << ifs.rdbuf() << std::endl;
+    ss << ifs.rdbuf();
     ifs.close();
     return ss.str();
 }
+
+struct InterpreterState;
+extern map<int, InterpreterState*> g_inters;
 
 int main() {
 
@@ -44,7 +47,7 @@ int main() {
         },
             nullptr, &id
             );
-    ExecuteCode(id, L"jumpfile \"AtomScript.txt\"");
+    ExecuteCode(id, L"jumpfile \"def.txt\"");
     Next(id);
 
 }

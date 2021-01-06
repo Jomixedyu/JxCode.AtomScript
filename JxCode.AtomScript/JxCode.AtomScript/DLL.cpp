@@ -21,10 +21,14 @@ struct InterpreterState
     wchar_t last_error[1024];
 };
 
-static map<int, InterpreterState*> g_inters;
+map<int, InterpreterState*> g_inters;
 static int g_index = 0;
 
 void SetErrorMessage(int id, const wchar_t* str);
+
+int kSuccess = 0;
+int kNullResult = 1;
+int kErrorMsg = 2;
 
 InterpreterState* GetState(int id)
 {
@@ -126,7 +130,7 @@ int Initialize(LoadFileCallBack _loadfile_, FunctionCallBack _funcall_, ErrorInf
             const vector<Token>& params)->bool {
                 return OnFuncall(id, user_type_id, domain, path, params);
         },
-            [id](const wstring& str) {
+        [id](const wstring& str) {
             OnError(id, str);
         });
 
@@ -136,7 +140,18 @@ int Initialize(LoadFileCallBack _loadfile_, FunctionCallBack _funcall_, ErrorInf
 
     g_inters[g_index] = state;
     *out_id = g_index;
-    return 0;
+
+    return kSuccess;
+}
+
+int ResetState(int id)
+{
+    auto state = GetState(id);
+    if (state == nullptr) {
+        return kNullResult;
+    }
+    state->interpreter->Reset();
+    return kSuccess;
 }
 
 void Terminate(int id)
@@ -155,70 +170,88 @@ int ExecuteCode(int id, const wchar_t* code)
     auto inter = CheckAndGetState(id);
 
     if (inter == nullptr) {
-        return 1;
+        return kNullResult;
     }
     try {
         inter->interpreter->ExecuteCode(code);
     }
     catch (atomscript::InterpreterException& e) {
-        SetErrorMessage(id, const_cast<wchar_t*>(e.what().c_str()));
-        return 2;
+        SetErrorMessage(id, e.what().c_str());
+        return kErrorMsg;
     }
-    return 0;
+    return kSuccess;
 }
 
 int Next(int id)
 {
-
     auto inter = CheckAndGetState(id);
     if (inter == nullptr) {
-        return 1;
+        return kNullResult;
     }
     try {
         inter->interpreter->Next();
     }
     catch (atomscript::InterpreterException& e) {
         SetErrorMessage(id, const_cast<wchar_t*>(e.what().c_str()));
-        return 2;
+        return kErrorMsg;
     }
-    return 0;
+    return kSuccess;
 }
 
 int SerializeState(int id, wchar_t* out_ser_str)
 {
     auto inter = CheckAndGetState(id);
     if (inter == nullptr) {
-        return 1;
+        return kNullResult;
     }
     try {
-        //*out_ser_str = inter->interpreter->Serialize().c_str();
+        wstring ser_str = inter->interpreter->Serialize();
+        wcscpy(out_ser_str, const_cast<wchar_t*>(ser_str.c_str()));
     }
     catch (atomscript::InterpreterException& e) {
-        SetErrorMessage(id, const_cast<wchar_t*>(e.what().c_str()));
-        return 2;
+        SetErrorMessage(id, e.what().c_str());
+
+        return kErrorMsg;
     }
-    return 0;
+    return kSuccess;
 }
 
 int DeserializeState(int id, wchar_t* deser_str)
 {
     auto inter = CheckAndGetState(id);
     if (inter == nullptr) {
-        return 1;
+        return kNullResult;
     }
     try {
         inter->interpreter->Deserialize(deser_str);
     }
     catch (atomscript::InterpreterException& e) {
-        SetErrorMessage(id, const_cast<wchar_t*>(e.what().c_str()));
-        return 2;
+        SetErrorMessage(id, e.what().c_str());
+        return kErrorMsg;
     }
-    return 0;
+    return kSuccess;
+}
+
+int GetStateStatus(int id, int* exeptr, int* var_counts)
+{
+    auto inter = CheckAndGetState(id);
+    if (inter == nullptr) {
+        return kNullResult;
+    }
+    *exeptr = inter->interpreter->line_num();
+    *var_counts = (int)inter->interpreter->variables().size();
+    return kSuccess;
+}
+
+int ReleaseSerializeStr(wchar_t* ptr)
+{
+    delete[] ptr;
+    return kSuccess;
 }
 
 void GetLibVersion(wchar_t* out)
 {
-    wcscpy(out, L"JxCode.Lang.AtomScript 1.0 Ç§Óæ");
+    wcscpy(out, L"JxCode.Lang.AtomScript 1.0");
 }
 
 BOOL APIENTRY DllMain(

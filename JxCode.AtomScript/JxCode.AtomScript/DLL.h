@@ -1,12 +1,15 @@
 #ifndef JXCODE_LANG_atomscript_DLL_H
 #define JXCODE_LANG_atomscript_DLL_H
 
-#pragma warning(disable:4996)
-
 #include <stdint.h>
 #define CALLAPI __stdcall
 
-typedef struct 
+#ifdef _WIN32
+#define DLLEXPORT __declspec(dllexport)
+#pragma warning(disable:4996)
+#endif // _WIN32
+
+typedef struct
 {
     wchar_t* value;
     int line;
@@ -26,14 +29,17 @@ typedef void(*ErrorInfoCallBack)(const wchar_t* path);
 #ifdef __cplusplus
 extern "C" {
 #endif
-    void CALLAPI GetErrorMessage(int id, wchar_t* out_str);
-    int CALLAPI Initialize(LoadFileCallBack _loadfile_, FunctionCallBack _funcall_, ErrorInfoCallBack _errorcb_, int* out_id);
-    void CALLAPI Terminate(int id);
-    int CALLAPI ExecuteCode(int id, const wchar_t* code);
-    int CALLAPI Next(int id);
-    int CALLAPI SerializeState(int id, wchar_t* out_ser_str);
-    int CALLAPI DeserializeState(int id, wchar_t* deser_str);
-    void CALLAPI GetLibVersion(wchar_t* out);
+    DLLEXPORT void CALLAPI GetErrorMessage(int id, wchar_t* out_str);
+    DLLEXPORT int CALLAPI Initialize(LoadFileCallBack _loadfile_, FunctionCallBack _funcall_, ErrorInfoCallBack _errorcb_, int* out_id);
+    DLLEXPORT void CALLAPI Terminate(int id);
+    DLLEXPORT int CALLAPI ResetState(int id);
+    DLLEXPORT int CALLAPI ExecuteCode(int id, const wchar_t* code);
+    DLLEXPORT int CALLAPI Next(int id);
+    DLLEXPORT int CALLAPI SerializeState(int id, wchar_t* out_ser_str);
+    DLLEXPORT int CALLAPI DeserializeState(int id, wchar_t* deser_str);
+    DLLEXPORT int CALLAPI GetStateStatus(int id, int* exeptr, int* var_counts);
+    DLLEXPORT int CALLAPI ReleaseSerializeStr(wchar_t* ptr);
+    DLLEXPORT void CALLAPI GetLibVersion(wchar_t* out);
 #ifdef __cplusplus
 }
 #endif

@@ -35,6 +35,13 @@ namespace jxcode::lexer
         extern TokenType_t LessThan;
         extern TokenType_t SingleArrow;
         extern TokenType_t DoubleArrow;
+        extern TokenType_t Tilde;
+        extern TokenType_t Exclamatory;
+        extern TokenType_t At;
+        extern TokenType_t Pound;
+        extern TokenType_t Doller;
+        extern TokenType_t Precent;
+        extern TokenType_t Question;
     }
 
     struct Token

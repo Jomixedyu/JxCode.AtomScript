@@ -19,7 +19,7 @@ namespace jxcode::atomscript
     using std::function;
     using lexer::Token;
 
-    enum class VariableType
+    enum class VariableType : int
     {
         Null,
         Numeric,
@@ -33,16 +33,19 @@ namespace jxcode::atomscript
         VariableType type;
         float num;
         wstring str;
-        intptr_t user_type_ptr;
+        int user_type_ptr;
     public:
         Variable();
         Variable(const float& num);
         Variable(const wstring& str);
-        Variable(const intptr_t& user_type_ptr);
+        Variable(const int& user_type_ptr);
     public:
         void SetNumber(const float& num);
         void SetString(const wstring& str);
-        void SetUserVarId(const intptr_t& user_type_ptr);
+        void SetUserVarId(const int& user_type_ptr);
+    public:
+        wstring GetSerializeData();
+        static Variable DeserializeData(const wstring& data);
     };
 
     class InterpreterException
@@ -98,14 +101,17 @@ namespace jxcode::atomscript
         bool IsExistLabel(const wstring& label);
         void SetVar(const wstring& name, const float& num);
         void SetVar(const wstring& name, const wstring& str);
-        void SetVar(const wstring& name, const intptr_t& user_id);
+        void SetVar(const wstring& name, const int& user_id);
+        void SetVar(const wstring& name, const Variable& var);
         void DelVar(const wstring& name);
         Variable* GetVar(const wstring& name);
     public:
         Interpreter* ExecuteCode(const wstring& code);
         Interpreter* Next();
+        
+        void Reset();
 
-        std::wstring Serialize();
+        wstring Serialize();
         void Deserialize(const wstring& text);
     };
 }
