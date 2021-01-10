@@ -387,6 +387,7 @@ namespace jxcode
         map<wstring, TokenType_t> get_std_operator_map() {
             map<wstring, TokenType_t> mp;
             mp[L"=="] = TokenType::DoubleEqual;
+            mp[L"!="] = TokenType::ExclamatoryAndEqual;
             mp[L"="] = TokenType::Equal;
             mp[L"("] = TokenType::LBracket;
             mp[L")"] = TokenType::RBracket;
@@ -396,24 +397,12 @@ namespace jxcode
             mp[L"-"] = TokenType::Minus;
             mp[L"+"] = TokenType::Plus;
             mp[L"/"] = TokenType::Division;
-            mp[L"!="] = TokenType::ExclamatoryAndEqual;
-            mp[L"::"] = TokenType::DoubleColon;
-            mp[L":"] = TokenType::Colon;
             mp[L","] = TokenType::Comma;
             mp[L"."] = TokenType::Dot;
             mp[L">"] = TokenType::GreaterThan;
             mp[L"<"] = TokenType::LessThan;
 
-            mp[L"~"] = TokenType::Tilde;
             mp[L"!"] = TokenType::Exclamatory;
-            mp[L"@"] = TokenType::At;
-            mp[L"#"] = TokenType::Pound;
-            mp[L"$"] = TokenType::Doller;
-            mp[L"%"] = TokenType::Precent;
-
-            mp[L"->"] = TokenType::SingleArrow;
-            mp[L"=>"] = TokenType::DoubleArrow;
-
             return mp;
         }
 

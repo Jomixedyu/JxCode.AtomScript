@@ -6,7 +6,6 @@
 
 namespace jxcode::atomscript
 {
-
     using namespace std;
     using namespace lexer;
 
@@ -328,13 +327,44 @@ namespace jxcode::atomscript
         return str;
     }
     */
+    static map<wstring, TokenType_t> get_atom_operator_map() {
+        map<wstring, TokenType_t> mp;
+        mp[L"=="] = TokenType::DoubleEqual;
+        mp[L"="] = TokenType::Equal;
+        mp[L"("] = TokenType::LBracket;
+        mp[L")"] = TokenType::RBracket;
+        mp[L"&&"] = TokenType::And;
+        mp[L"||"] = TokenType::Or;
+        mp[L"*"] = TokenType::Multiple;
+        mp[L"-"] = TokenType::Minus;
+        mp[L"+"] = TokenType::Plus;
+        mp[L"/"] = TokenType::Division;
+        mp[L"!="] = TokenType::ExclamatoryAndEqual;
+        mp[L"::"] = TokenType::DoubleColon;
+        mp[L":"] = TokenType::Colon;
+        mp[L","] = TokenType::Comma;
+        mp[L"."] = TokenType::Dot;
+        mp[L">"] = TokenType::GreaterThan;
+        mp[L"<"] = TokenType::LessThan;
 
+        mp[L"~"] = TokenType::Tilde;
+        mp[L"!"] = TokenType::Exclamatory;
+        mp[L"@"] = TokenType::At;
+        mp[L"#"] = TokenType::Pound;
+        mp[L"$"] = TokenType::Doller;
+        mp[L"%"] = TokenType::Precent;
+
+        mp[L"->"] = TokenType::SingleArrow;
+        mp[L"=>"] = TokenType::DoubleArrow;
+
+        return mp;
+    }
     Interpreter* Interpreter::ExecuteCode(const wstring& code)
     {
         this->ResetCodeState();
 
         auto tokens = lexer::Scanner(&const_cast<wstring&>(code),
-            &lexer::get_std_operator_map(),
+            &get_atom_operator_map(),
             &lexer::get_std_esc_char_map());
 
         this->commands_ = ParseOpList(tokens);
