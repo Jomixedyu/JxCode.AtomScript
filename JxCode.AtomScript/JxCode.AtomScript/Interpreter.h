@@ -74,11 +74,9 @@ namespace jxcode::atomscript
             const vector<Token>& domain,
             const vector<Token>& path,
             const vector<Token>& params)>;
-        using ErrorInfoCallBack = function<void(const wstring& error_info)>;
     protected:
         LoadFileCallBack _loadfile_;
         FuncallCallBack _funcall_;
-        ErrorInfoCallBack _errorcall_;
 
         vector<OpCommand> commands_;
         int32_t exec_ptr_;
@@ -92,8 +90,7 @@ namespace jxcode::atomscript
     public:
         Interpreter(
             LoadFileCallBack _loadfile_,
-            FuncallCallBack _funcall_,
-            ErrorInfoCallBack _errorcall_);
+            FuncallCallBack _funcall_);
     protected:
         void ResetCodeState();
         bool ExecuteLine(const OpCommand& cmd);

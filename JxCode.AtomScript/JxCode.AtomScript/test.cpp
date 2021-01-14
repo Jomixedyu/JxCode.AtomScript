@@ -35,18 +35,18 @@ int main() {
 
     int id = 0;
     Initialize(
-        [](const wchar_t* path)->wchar_t* {
+        [](int id, const wchar_t* path)->wchar_t* {
             wstring dir(L"C:\\Users\\Jayshonyves\\Desktop\\" + wstring(path));
             wstring* str = new wstring(readAllText(dir));
             wcout << dir << endl;
             return const_cast<wchar_t*>(str->c_str());
         },
-        [](intptr_t user_type_id, TokenGroup domain, TokenGroup path, TokenGroup params)->int {
+        [](int id, intptr_t user_type_id, TokenGroup domain, TokenGroup path, TokenGroup params)->int {
             wcout << user_type_id << endl;
             return true;
-        },
-            nullptr, &id
-            );
+        })
+        ;
+
     ExecuteCode(id, L"jumpfile \"def.txt\"");
     Next(id);
 

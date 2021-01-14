@@ -15,35 +15,35 @@ using namespace jxcode::atomscript;
 struct InterpreterState
 {
     atomscript::Interpreter* interpreter;
-    LoadFileCallBack loadfile;
-    FunctionCallBack funcall;
-    ErrorInfoCallBack errorcb;
     wchar_t last_error[1024];
 };
 
-map<int, InterpreterState*> g_inters;
+static LoadFileCallBack _loadfile;
+static FunctionCallBack _funcall;
+
+static map<int, InterpreterState*> g_inters;
 static int g_index = 0;
 
-void SetErrorMessage(int id, const wchar_t* str);
+static void SetErrorMessage(int id, const wchar_t* str);
 
-int kSuccess = 0;
-int kNullResult = 1;
-int kErrorMsg = 2;
+static int kSuccess = 0;
+static int kNullResult = 1;
+static int kErrorMsg = 2;
 
-InterpreterState* GetState(int id)
+static InterpreterState* GetState(int id)
 {
     if (g_inters.find(id) == g_inters.end()) {
         return nullptr;
     }
     return g_inters[id];
 }
-void DelState(int id)
+static void DelState(int id)
 {
     if (GetState(id) != nullptr) {
         g_inters.erase(id);
     }
 }
-InterpreterState* CheckAndGetState(int id) {
+static InterpreterState* CheckAndGetState(int id) {
     auto state = GetState(id);
     if (state == nullptr) {
         wchar_t str[] = L"not found interpreter instance";
@@ -52,13 +52,8 @@ InterpreterState* CheckAndGetState(int id) {
     return state;
 }
 
-wstring OnLoadFile(int id, const wstring& path)
-{
-    auto inter = GetState(id);
-    return inter->loadfile(path.c_str());
-}
 
-TokenGroup GetTokenGroup(const vector<Token>& tokens) {
+static TokenGroup GetTokenGroup(const vector<Token>& tokens) {
     TokenGroup group;
     memset(&group, 0, sizeof(TokenGroup));
     for (group.size = 0; group.size < tokens.size(); group.size++)
@@ -72,7 +67,13 @@ TokenGroup GetTokenGroup(const vector<Token>& tokens) {
     return group;
 }
 
-bool OnFuncall(int id,
+static wstring OnLoadFile(int id, const wstring& path)
+{
+    auto inter = GetState(id);
+    return _loadfile(id, path.c_str());
+}
+
+static bool OnFuncall(int id,
     const intptr_t& user_type_id,
     const vector<Token>& domain,
     const vector<Token>& path,
@@ -81,22 +82,11 @@ bool OnFuncall(int id,
     auto inter = GetState(id);
 
     intptr_t userid = user_type_id;
-
     TokenGroup _domain = GetTokenGroup(domain);
-
     TokenGroup _path = GetTokenGroup(path);
-
     TokenGroup _param = GetTokenGroup(params);
 
-    return inter->funcall(userid, _domain, _path, _param);
-}
-void OnError(int id, const wstring& str)
-{
-    auto inter = GetState(id);
-    if (inter->errorcb == nullptr) {
-        return;
-    }
-    inter->errorcb(str.c_str());
+    return _funcall(id, userid, _domain, _path, _param);
 }
 
 
@@ -105,14 +95,20 @@ void CALLAPI GetErrorMessage(int id, wchar_t* out_str)
     auto inter = GetState(id);
     wcscpy(out_str, inter->last_error);
 }
-void SetErrorMessage(int id, const wchar_t* str)
+static void SetErrorMessage(int id, const wchar_t* str)
 {
     auto inter = GetState(id);
     memcpy(inter->last_error, str, 1024);
     inter->last_error[1023] = L'\0';
 }
 
-int CALLAPI Initialize(LoadFileCallBack _loadfile_, FunctionCallBack _funcall_, ErrorInfoCallBack _errorcb_, int* out_id)
+int CALLAPI Initialize(LoadFileCallBack _loadfile_, FunctionCallBack _funcall_)
+{
+    _loadfile = _loadfile_;
+    _funcall = _funcall_;
+    return kSuccess;
+}
+int CALLAPI NewInterpreter(int* out_id)
 {
     auto id = ++g_index;
 
@@ -129,18 +125,9 @@ int CALLAPI Initialize(LoadFileCallBack _loadfile_, FunctionCallBack _funcall_, 
             const vector<Token>& path,
             const vector<Token>& params)->bool {
                 return OnFuncall(id, user_type_id, domain, path, params);
-        },
-        [id](const wstring& str) {
-            OnError(id, str);
         });
-
-    state->loadfile = _loadfile_;
-    state->funcall = _funcall_;
-    state->errorcb = _errorcb_;
-
     g_inters[g_index] = state;
     *out_id = g_index;
-
     return kSuccess;
 }
 
@@ -153,6 +140,8 @@ int CALLAPI ResetState(int id)
     state->interpreter->Reset();
     return kSuccess;
 }
+
+
 
 void CALLAPI Terminate(int id)
 {
@@ -196,7 +185,7 @@ int CALLAPI Next(int id)
         return kErrorMsg;
     }
     catch (const exception& e) {
-        
+
         SetErrorMessage(id, L"error");
         return kErrorMsg;
     }

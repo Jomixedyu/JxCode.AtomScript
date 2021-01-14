@@ -22,15 +22,16 @@ typedef struct
     int size;
 } TokenGroup;
 
-typedef wchar_t* (*LoadFileCallBack)(const wchar_t* path);
-typedef int(*FunctionCallBack)(intptr_t user_type_id, TokenGroup domain, TokenGroup path, TokenGroup params);
-typedef void(*ErrorInfoCallBack)(const wchar_t* path);
+typedef wchar_t* (*LoadFileCallBack)(int id, const wchar_t* path);
+typedef int(*FunctionCallBack)(int id, intptr_t user_type_id, TokenGroup domain, TokenGroup path, TokenGroup params);
+typedef void(*ErrorInfoCallBack)(int id, const wchar_t* path);
 
 #ifdef __cplusplus
 extern "C" {
 #endif
     DLLEXPORT void CALLAPI GetErrorMessage(int id, wchar_t* out_str);
-    DLLEXPORT int CALLAPI Initialize(LoadFileCallBack _loadfile_, FunctionCallBack _funcall_, ErrorInfoCallBack _errorcb_, int* out_id);
+    DLLEXPORT int CALLAPI Initialize(LoadFileCallBack _loadfile_, FunctionCallBack _funcall_);
+    DLLEXPORT int CALLAPI NewInterpreter(int* id);
     DLLEXPORT void CALLAPI Terminate(int id);
     DLLEXPORT int CALLAPI ResetState(int id);
     DLLEXPORT int CALLAPI ExecuteCode(int id, const wchar_t* code);

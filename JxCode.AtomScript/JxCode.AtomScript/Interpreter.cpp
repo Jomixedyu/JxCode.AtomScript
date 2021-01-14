@@ -33,8 +33,8 @@ namespace jxcode::atomscript
     {
         return this->variables_;
     }
-    Interpreter::Interpreter(LoadFileCallBack _loadfile_, FuncallCallBack _funcall_, ErrorInfoCallBack _errorcall_)
-        : exec_ptr_(-1), _loadfile_(_loadfile_), _funcall_(_funcall_), _errorcall_(_errorcall_)
+    Interpreter::Interpreter(LoadFileCallBack _loadfile_, FuncallCallBack _funcall_)
+        : exec_ptr_(-1), _loadfile_(_loadfile_), _funcall_(_funcall_)
     {
     }
 
