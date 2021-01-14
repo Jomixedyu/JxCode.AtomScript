@@ -260,6 +260,7 @@ namespace jxcode::atomscript
 
             for (; first < cmd.targets.size(); first++) {
                 const Token& token = cmd.targets[first];
+                //先直接省略逗号
                 if (token.token_type == TokenType::Comma) {
                     continue;
                 }

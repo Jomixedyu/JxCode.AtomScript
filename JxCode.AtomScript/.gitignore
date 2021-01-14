@@ -1,5 +1,5 @@
 .vs
 x64
-Debug
-JxCCode.Lang\x64
-JxCCode.Lang\Debug
+Win32
+JxCode.AtomScript\x64
+JxCode.AtomScript\Win32

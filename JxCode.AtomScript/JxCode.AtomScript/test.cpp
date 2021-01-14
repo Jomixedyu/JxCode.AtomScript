@@ -43,7 +43,7 @@ int main() {
         },
         [](intptr_t user_type_id, TokenGroup domain, TokenGroup path, TokenGroup params)->int {
             wcout << user_type_id << endl;
-            return false;
+            return true;
         },
             nullptr, &id
             );

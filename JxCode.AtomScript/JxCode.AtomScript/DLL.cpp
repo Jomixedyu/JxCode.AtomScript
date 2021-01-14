@@ -61,7 +61,7 @@ wstring OnLoadFile(int id, const wstring& path)
 TokenGroup GetTokenGroup(const vector<Token>& tokens) {
     TokenGroup group;
     memset(&group, 0, sizeof(TokenGroup));
-    for (group.size = 0; group.size <= tokens.size() - 1; group.size++)
+    for (group.size = 0; group.size < tokens.size(); group.size++)
     {
         TokenInfo info;
         info.line = tokens[group.size].line;
@@ -100,7 +100,7 @@ void OnError(int id, const wstring& str)
 }
 
 
-void GetErrorMessage(int id, wchar_t* out_str)
+void CALLAPI GetErrorMessage(int id, wchar_t* out_str)
 {
     auto inter = GetState(id);
     wcscpy(out_str, inter->last_error);
@@ -112,7 +112,7 @@ void SetErrorMessage(int id, const wchar_t* str)
     inter->last_error[1023] = L'\0';
 }
 
-int Initialize(LoadFileCallBack _loadfile_, FunctionCallBack _funcall_, ErrorInfoCallBack _errorcb_, int* out_id)
+int CALLAPI Initialize(LoadFileCallBack _loadfile_, FunctionCallBack _funcall_, ErrorInfoCallBack _errorcb_, int* out_id)
 {
     auto id = ++g_index;
 
@@ -144,7 +144,7 @@ int Initialize(LoadFileCallBack _loadfile_, FunctionCallBack _funcall_, ErrorInf
     return kSuccess;
 }
 
-int ResetState(int id)
+int CALLAPI ResetState(int id)
 {
     auto state = GetState(id);
     if (state == nullptr) {
@@ -154,7 +154,7 @@ int ResetState(int id)
     return kSuccess;
 }
 
-void Terminate(int id)
+void CALLAPI Terminate(int id)
 {
     auto state = GetState(id);
     if (state == nullptr) {
@@ -165,7 +165,7 @@ void Terminate(int id)
     DelState(id);
 }
 
-int ExecuteCode(int id, const wchar_t* code)
+int CALLAPI ExecuteCode(int id, const wchar_t* code)
 {
     auto inter = CheckAndGetState(id);
 
@@ -182,7 +182,7 @@ int ExecuteCode(int id, const wchar_t* code)
     return kSuccess;
 }
 
-int Next(int id)
+int CALLAPI Next(int id)
 {
     auto inter = CheckAndGetState(id);
     if (inter == nullptr) {
@@ -192,13 +192,18 @@ int Next(int id)
         inter->interpreter->Next();
     }
     catch (atomscript::InterpreterException& e) {
-        SetErrorMessage(id, const_cast<wchar_t*>(e.what().c_str()));
+        SetErrorMessage(id, e.what().c_str());
+        return kErrorMsg;
+    }
+    catch (const exception& e) {
+        
+        SetErrorMessage(id, L"error");
         return kErrorMsg;
     }
     return kSuccess;
 }
 
-int SerializeState(int id, wchar_t* out_ser_str)
+int CALLAPI SerializeState(int id, wchar_t* out_ser_str)
 {
     auto inter = CheckAndGetState(id);
     if (inter == nullptr) {
@@ -216,7 +221,7 @@ int SerializeState(int id, wchar_t* out_ser_str)
     return kSuccess;
 }
 
-int DeserializeState(int id, wchar_t* deser_str)
+int CALLAPI DeserializeState(int id, wchar_t* deser_str)
 {
     auto inter = CheckAndGetState(id);
     if (inter == nullptr) {
@@ -232,7 +237,7 @@ int DeserializeState(int id, wchar_t* deser_str)
     return kSuccess;
 }
 
-int GetStateStatus(int id, int* exeptr, int* var_counts)
+int CALLAPI GetStateStatus(int id, int* exeptr, int* var_counts)
 {
     auto inter = CheckAndGetState(id);
     if (inter == nullptr) {
@@ -243,13 +248,13 @@ int GetStateStatus(int id, int* exeptr, int* var_counts)
     return kSuccess;
 }
 
-int ReleaseSerializeStr(wchar_t* ptr)
+int CALLAPI ReleaseSerializeStr(wchar_t* ptr)
 {
     delete[] ptr;
     return kSuccess;
 }
 
-void GetLibVersion(wchar_t* out)
+void CALLAPI GetLibVersion(wchar_t* out)
 {
     wcscpy(out, L"JxCode.Lang.AtomScript 1.0");
 }
