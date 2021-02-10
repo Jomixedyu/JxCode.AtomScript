@@ -3,15 +3,14 @@
 #include "Lexer.h"
 #include <regex>
 #include <codecvt>
+#include <sstream>
 
 namespace jxcode::atomscript
 {
     using namespace std;
     using namespace lexer;
 
-    wstring InterpreterException::ParserException = wstring(L"ParserException");
-    wstring InterpreterException::RuntimeException = wstring(L"RunetimeException");
-
+#pragma region InterpreterException
     InterpreterException::InterpreterException(const lexer::Token& token, const std::wstring& message)
         : token_(token), message_(message) {}
 
@@ -19,7 +18,10 @@ namespace jxcode::atomscript
     {
         return this->token_.to_string();
     }
+#pragma endregion
 
+
+#pragma region Interpreter
 
     int32_t Interpreter::line_num() const
     {
@@ -29,9 +31,13 @@ namespace jxcode::atomscript
     {
         return this->commands_.size();
     }
-    map<wstring, Variable*>& Interpreter::variables()
+    const wstring& Interpreter::program_name() const
     {
-        return this->variables_;
+        return this->program_name_;
+    }
+    map<wstring, Variable>* Interpreter::variables()
+    {
+        return &this->variables_;
     }
     Interpreter::Interpreter(LoadFileCallBack _loadfile_, FuncallCallBack _funcall_)
         : exec_ptr_(-1), _loadfile_(_loadfile_), _funcall_(_funcall_)
@@ -45,66 +51,175 @@ namespace jxcode::atomscript
 
     void Interpreter::SetVar(const wstring& name, const float& num)
     {
-        Variable* var = this->GetVar(name);
-        if (var == nullptr) {
-            this->variables_[name] = new Variable(num);
+        Variable var = this->GetVar(name);
+        if (var.type == VARIABLETYPE_UNDEFINED) {
+            SetVariableNumber(&var, num);
+            this->variables_[name] = var;
         }
         else {
-            this->variables_[name]->SetNumber(num);
+            SetVariableNumber(&this->variables_[name], num);
         }
     }
 
     void Interpreter::SetVar(const wstring& name, const wstring& str)
     {
-        Variable* var = this->GetVar(name);
-        if (var == nullptr) {
-            this->variables_[name] = new Variable(str);
+        Variable var = this->GetVar(name);
+        if (var.type == VARIABLETYPE_UNDEFINED) {
+            this->variables_[name] = var;
         }
-        else {
-            this->variables_[name]->SetString(str);
-        }
+        int id = this->NewStrPtr(str);
+        SetVariableStrPtr(&this->variables_[name], id);
     }
 
     void Interpreter::SetVar(const wstring& name, const int& user_id)
     {
-        Variable* var = this->GetVar(name);
-        if (var == nullptr) {
-            this->variables_[name] = new Variable(user_id);
+        Variable var = this->GetVar(name);
+        if (var.type == VARIABLETYPE_UNDEFINED) {
+            this->variables_[name] = var;
         }
-        else {
-            this->variables_[name]->SetUserVarId(user_id);
-        }
+        SetVariableUserPtr(&this->variables_[name], user_id);
     }
 
     void Interpreter::SetVar(const wstring& name, const Variable& _var)
     {
-        Variable* var = this->GetVar(name);
-        if (var == nullptr) {
-            this->variables_[name] = new Variable(_var);
+        if (_var.type == VARIABLETYPE_UNDEFINED) {
+            return;
         }
-        else {
-            *this->variables_[name] = _var;
-        }
+        this->variables_[name] = _var;
     }
 
     void Interpreter::DelVar(const wstring& name)
     {
         auto it = this->variables_.find(name);
         if (it != this->variables_.end()) {
-            //回收内存
-            delete it->second;
             this->variables_.erase(it);
         }
     }
 
-    Variable* Interpreter::GetVar(const wstring& name)
+    Variable Interpreter::GetVar(const wstring& name)
     {
         auto it = this->variables_.find(name);
         if (it == this->variables_.end()) {
-            return nullptr;
+            Variable var;
+            SetVariableUndefined(&var);
+            return var;
         }
         return it->second;
     }
+
+    int Interpreter::GetStrPtr(const wstring& str)
+    {
+        int id = 0;
+        for (auto& item : this->strpool_) {
+            if (item.second == str) {
+                id = item.first;
+            }
+        }
+        return id;
+    }
+
+    int Interpreter::NewStrPtr(const wstring& str)
+    {
+        static int id = 0;
+
+        int _id = this->GetStrPtr(str);
+        if (_id != 0) {
+            return _id;
+        }
+
+        ++id;
+        this->strpool_[id] = str;
+        return 0;
+    }
+
+    wstring* Interpreter::GetString(const int& strptr)
+    {
+        return &this->strpool_[strptr];
+    }
+    void Interpreter::GCollect()
+    {
+        //如果变量中没有持有字符串池里的引用时销毁字符串
+        vector<int> delay_remove_list;
+        for (auto& item : this->strpool_) {
+            bool has_var = false;
+            for (auto& var_item : this->variables_) {
+                const Variable& var = var_item.second;
+                if (var.type == VARIABLETYPE_STRPTR && var.str_ptr == item.first) {
+                    has_var = true;
+                    break;
+                }
+            }
+            if (!has_var) {
+                delay_remove_list.push_back(item.first);
+            }
+        }
+        for (auto& item : delay_remove_list) {
+            this->strpool_.erase(item);
+        }
+    }
+
+    inline static bool IsLiteralToken(const Token& token) {
+        return token.token_type == TokenType::Number || token.token_type == TokenType::String;
+    }
+    inline static bool IsLiteralOrVarStrToken(Interpreter* inter, const Token& token) {
+        if (token.token_type == TokenType::String) {
+            return true;
+        }
+        if (token.token_type == TokenType::Ident) {
+            auto var = inter->GetVar(*token.value);
+            if (var.type == VARIABLETYPE_STRPTR) {
+                return true;
+            }
+        }
+        return false;
+    }
+    inline static void CheckValidLength(const OpCommand& cmd, int length) {
+        auto size = cmd.targets.size();
+        if (size != length) {
+            throw InterpreterException(cmd.op_token, L"arguments error");
+        }
+    }
+    inline static void CheckValidMinLength(const OpCommand& cmd, int min_length) {
+        auto size = cmd.targets.size();
+        if (size < min_length) {
+            throw InterpreterException(cmd.op_token, L"arguments error");
+        }
+    }
+    inline static void CheckValidIdent(const Token& token) {
+        if (token.token_type != TokenType::Ident) {
+            throw InterpreterException(token, L"argument not is ident");
+        }
+    }
+    inline static void CheckValidTokenType(const Token& token, const TokenType_t& type) {
+        if (token.token_type != type) {
+            throw InterpreterException(token, L"token type error");
+        }
+    }
+    inline static void CheckValidStrVarOrStrLiteral(Interpreter* inter, const Token& token) {
+        if (!IsLiteralOrVarStrToken(inter, token)) {
+            throw InterpreterException(token, L"type error");
+        }
+    }
+    inline static void CheckValidVariable(Interpreter* inter, const Token& token) {
+        auto var = inter->GetVar(*token.value);
+        if (var.type == VARIABLETYPE_UNDEFINED) {
+            throw InterpreterException(token, L"variable undefined");
+        }
+    }
+    inline static void CheckValidVariableOrLiteral(Interpreter* inter, const Token& token) {
+        //不是字面值 并且 变量不存在
+        if (!IsLiteralToken(token)
+            && inter->GetVar(*token.value).type == VARIABLETYPE_UNDEFINED)
+        {
+            throw InterpreterException(token, L"variable undefined");
+        }
+    }
+    inline static void CheckValidVariableType(const Token& token, const Variable& var, int type) {
+        if (var.type != type) {
+            throw InterpreterException(token, L"variable type error");
+        }
+    }
+
 
     void Interpreter::ResetCodeState()
     {
@@ -112,43 +227,45 @@ namespace jxcode::atomscript
         vector<OpCommand>().swap(this->commands_);
         this->exec_ptr_ = -1;
         decltype(this->labels_)().swap(this->labels_);
+        this->program_name_.clear();
     }
 
     bool Interpreter::ExecuteLine(const OpCommand& cmd)
     {
         if (cmd.code == OpCode::Label) {
-            //ig;
+            //ignore;
         }
         else if (cmd.code == OpCode::Goto) {
-            wstring label;
+            wstring* label;
             if (cmd.targets.size() == 2 && *cmd.targets[0].value == L"var") {
                 //goto var a
-                Variable* var = this->GetVar(*cmd.targets[1].value);
-                if (var == nullptr) {
-                    throw InterpreterException(cmd.targets[1], L"变量未找到");
-                }
-                else if (var->type != VariableType::String) {
-                    throw InterpreterException(cmd.targets[1], L"变量类型错误");
-                }
-                label = var->str;
+                CheckValidIdent(cmd.targets[0]);
+                CheckValidStrVarOrStrLiteral(this, cmd.targets[1]);
+
+                Variable var = this->GetVar(*cmd.targets[1].value);
+                label = this->GetString(var.str_ptr);
             }
             else if (cmd.targets.size() == 1) {
                 //goto label
-                label = *cmd.targets[0].value;
+                CheckValidStrVarOrStrLiteral(this, cmd.targets[0]);
+                label = cmd.targets[0].value.get();
             }
             else {
                 throw InterpreterException(cmd.op_token, L"goto语句错误");
             }
             //Check
-            if (this->labels_.find(label) == this->labels_.end()) {
+            if (this->labels_.find(*label) == this->labels_.end()) {
                 throw InterpreterException(cmd.op_token, L"Label不存在");
             }
             //jump
-            size_t pos = this->labels_[label];
+            size_t pos = this->labels_[*label];
             this->exec_ptr_ = pos;
         }
         else if (cmd.code == OpCode::Set) {
-            //暂时不用表达式，只使用一个值
+            //暂时不用表达式，只使用一个值 暂时就三个
+            CheckValidLength(cmd, 3);
+            CheckValidIdent(cmd.targets[0]);
+            CheckValidTokenType(cmd.targets[1], TokenType::Equal);
 
             wstring& varname = *cmd.targets[0].value;
 
@@ -160,15 +277,33 @@ namespace jxcode::atomscript
                 this->SetVar(varname, *cmd.targets[2].value);
             }
             else if (cmd.targets[2].token_type == TokenType::Ident) {
-                auto v = this->GetVar(*cmd.targets[2].value);
-                this->SetVar(varname, *v);
+                Variable v = this->GetVar(*cmd.targets[2].value);
+                if (v.type == VARIABLETYPE_UNDEFINED) {
+                    throw InterpreterException(cmd.targets[2], L"variable not found");
+                }
+                this->SetVar(varname, v);
             }
         }
         else if (cmd.code == OpCode::Del) {
+            CheckValidLength(cmd, 1);
+            CheckValidIdent(cmd.targets[0]);
             this->DelVar(*cmd.targets[0].value);
         }
         else if (cmd.code == OpCode::JumpFile) {
-            wstring code = this->_loadfile_(*cmd.targets[0].value);
+            wstring* pfilestr;
+            CheckValidLength(cmd, 1);
+            Token token = cmd.targets[0];
+            CheckValidStrVarOrStrLiteral(this, token);
+
+            if (token.token_type == TokenType::Ident) {
+                auto var = this->GetVar(*token.value);
+                pfilestr = this->GetString(var.str_ptr);
+            }
+            else {
+                pfilestr = token.value.get();
+            }
+
+            wstring code = this->_loadfile_(*pfilestr);
             this->ExecuteCode(code);
         }
         else if (cmd.code == OpCode::If) {
@@ -178,6 +313,9 @@ namespace jxcode::atomscript
         else if (cmd.code == OpCode::ClearSubVar) {
             //清理子变量
             //子变量规则，Obj__subvar
+            CheckValidLength(cmd, 1);
+            CheckValidIdent(cmd.targets[0]);
+
             auto target = cmd.targets[0].value;
 
             auto it = this->variables_.begin();
@@ -193,37 +331,37 @@ namespace jxcode::atomscript
         }
         else if (cmd.code == OpCode::Call) {
             //
-            Variable* var = this->GetVar(*cmd.targets[0].value);
+            Variable var = this->GetVar(*cmd.targets[0].value);
 
             vector<Token> domain;
             vector<Token> path;
-            vector<Token> params;
+            vector<Variable> params;
 
-            intptr_t user_type_ptr = 0;
+            int var_userptr = 0;
 
-            int32_t first = 0;
-            //inst
-            if (var != nullptr) {
-                if (var->type != VariableType::UserVarId) {
-                    throw InterpreterException(cmd.targets[0], L"变量非user类型");
-                }
-                user_type_ptr = 0;
-                first = 1;
+            int32_t index = 0;
+
+            //instance
+            if (var.type != VARIABLETYPE_UNDEFINED) {
+                CheckValidVariableType(cmd.targets[0], var, VARIABLETYPE_USERPTR);
+                var_userptr = var.user_ptr;
+                index = 1;
             }
 
             bool is_symbol = false;
             bool is_last_domain = false;
             bool is_last_path = false;
 
-            if (var != nullptr) {
-                is_last_path = true; //对象直接获取子对象
+            if (var.type != VARIABLETYPE_UNDEFINED) {
+                is_symbol = true; //看下一个符号是什么
+                //is_last_path = true; //对象直接获取子对象
             }
             else {
                 is_last_domain = true; //静态从顶级域开始查找
             }
 
-            for (; first < cmd.targets.size(); first++) {
-                const Token& token = cmd.targets[first];
+            for (; index < cmd.targets.size(); index++) {
+                const Token& token = cmd.targets[index];
 
                 if (is_symbol) {
                     if (token.token_type == TokenType::DoubleColon) {
@@ -236,7 +374,7 @@ namespace jxcode::atomscript
                     }
                     else if (token.token_type == TokenType::Colon) {
                         //函数运算符，退出
-                        first++;
+                        index++;
                         break;
                     }
                     else {
@@ -246,11 +384,11 @@ namespace jxcode::atomscript
                 }
                 else {
                     if (is_last_domain) {
-                        domain.push_back(cmd.targets[first]);
+                        domain.push_back(cmd.targets[index]);
                         is_last_domain = false;
                     }
                     if (is_last_path) {
-                        path.push_back(cmd.targets[first]);
+                        path.push_back(cmd.targets[index]);
                         is_last_path = false;
                     }
 
@@ -258,76 +396,40 @@ namespace jxcode::atomscript
                 }
             }
 
-            for (; first < cmd.targets.size(); first++) {
-                const Token& token = cmd.targets[first];
+            for (; index < cmd.targets.size(); index++) {
+                const Token& token = cmd.targets[index];
+
                 //先直接省略逗号
                 if (token.token_type == TokenType::Comma) {
                     continue;
                 }
-                params.push_back(token);
+
+                Variable temp_var;
+
+                CheckValidVariableOrLiteral(this, token);
+                if (IsLiteralToken(token)) {
+                    if (token.token_type == TokenType::Number) {
+                        SetVariableNumber(&temp_var, stof(*token.value));
+                    }
+                    else if (token.token_type == TokenType::String) {
+                        auto strptr = this->NewStrPtr(*token.value);
+                        SetVariableStrPtr(&temp_var, strptr);
+                    }
+                }
+                else {
+                    temp_var = this->GetVar(*token.value);
+                }
+
+                params.push_back(temp_var);
+
             }
 
-            return this->_funcall_(user_type_ptr, domain, path, params);
+            return this->_funcall_(var_userptr, domain, path, params);
         }
 
         return true;
     }
 
-    /*
-    static void str_replace(wstring& str, const wstring& src, const wstring& n)
-    {
-        int index = 0;
-        while ((index = str.find(src, index)) != str.npos) {
-            str.replace(index, src.size(), n);
-            index += n.size();
-        }
-    }
-    */
-    /*
-    static wstring pre_process(const wstring& _str)
-    {
-        if (_str.size() == 0) {
-            return _str;
-        }
-        bool is_pre_def = false;
-        bool is_newline = true;
-        wstring replace_def = L"#replace";
-
-        wstring str = _str;
-
-        for (size_t i = 0; i < str.size(); i++)
-        {
-            if (is_newline) {
-                if (str[i] == L'#')
-                {
-                    size_t index = i;
-                    while (index != str.size() - 1 && str[index] != L'\n') {
-                        //end
-                        index++;
-                    }
-                    wstring line_content = str.substr(i, index - i);
-                    if (line_content.compare(0, replace_def.size(), replace_def) == 0) {
-                        //#replace
-                        wstring cmd_content = line_content.substr(replace_def.size() + 1);
-                        size_t space_pos = cmd_content.find(L' ');
-                        wstring left = cmd_content.substr(0, space_pos);
-                        wstring right = cmd_content.substr(space_pos + 1);
-                        //删除预处理代码
-                        str.replace(i, index - i, L"");
-                        //开始替换
-                        str_replace(str, left, right);
-                    }
-                }
-                is_newline = false;
-            }
-
-            if (str[i] == L'\n') {
-                is_newline = true;
-            }
-        }
-        return str;
-    }
-    */
     static map<wstring, TokenType_t> get_atom_operator_map() {
         map<wstring, TokenType_t> mp;
         mp[L"=="] = TokenType::DoubleEqual;
@@ -382,24 +484,36 @@ namespace jxcode::atomscript
         return this;
     }
 
-    Interpreter* Interpreter::Next()
+    Interpreter* Interpreter::ExecuteProgram(const wstring& program_name_)
+    {
+        this->program_name_ = program_name_;
+        wstring code = this->_loadfile_(program_name_);
+        this->ExecuteCode(code);
+        return this;
+    }
+
+    bool Interpreter::Next()
     {
         //check
         if (this->exec_ptr_ + 1 >= (int32_t)this->opcmd_count()) {
             this->ResetCodeState();
-            return this;
+            return false;
         }
 
         bool is_next = false;
         //execute
         ++this->exec_ptr_;
 
-        while (is_next = ExecuteLine(this->commands_[this->exec_ptr_])) {
+        while (is_next = this->ExecuteLine(this->commands_[this->exec_ptr_])) {
             ++this->exec_ptr_;
+            //每隔128行执行一次GC
+            if (this->exec_ptr_ % 128 == 0) {
+                this->GCollect();
+            }
             //check range
             if (this->exec_ptr_ >= (int32_t)this->opcmd_count()) {
                 this->ResetCodeState();
-                return this;
+                return false;
             }
             else {
                 //监控
@@ -407,129 +521,156 @@ namespace jxcode::atomscript
             }
         }
 
-        return this;
+        return true;
     }
 
     void Interpreter::Reset()
     {
         this->ResetCodeState();
         decltype(this->variables_)().swap(this->variables_);
+        decltype(this->strpool_)().swap(this->strpool_);
     }
 
-    wstring Interpreter::Serialize()
+    inline static void StreamWriteInt32(ostream* stream, int32_t i)
     {
-        size_t size = 0;
-        wstring str;
+        stream->write((char*)&i, sizeof(int32_t));
+    }
+    inline static int32_t StreamReadInt32(istream* stream)
+    {
+        char bytes[sizeof(int32_t)];
+        stream->read(bytes, sizeof(int32_t));
+        int32_t i = *(int32_t*)&bytes;
+        return i;
+    }
+
+    string Interpreter::Serialize()
+    {
+        this->GCollect();
+
+        std::wstring_convert<std::codecvt_utf8<wchar_t>> c;
+        stringstream ss;
+
+        //variables
+
+        StreamWriteInt32(&ss, (int32_t)this->variables_.size());
+
         for (auto& item : this->variables_) {
-            str += item.first;
-            str += 3;
-            str += item.second->GetSerializeData();
-            str += 4;
-        }
-        return str;
-    }
 
-    void Interpreter::Deserialize(const wstring& _text)
-    {
-        wstring& text = const_cast<wstring&>(_text);
-        if (text.size() == 0) {
-            return;
-        }
+            auto name = c.to_bytes(item.first);
+            int32_t _length = (int32_t)name.size();
 
-        size_t head = 0;
-        size_t tail = 0;
-        while (true) {
-            if (text.size() == tail) {
-                break;
-            }
-            if (text[tail] == 4) {
-                wstring str = text.substr(head, tail - head);
-                auto spl_pos = str.find((wchar_t)3);
-                wstring name = str.substr(0, spl_pos);
-                wstring var_str = str.substr(spl_pos + 1);
-                auto var = Variable::DeserializeData(var_str);
-                this->variables_[name] = new Variable(var);
-                head = tail + 1;
-            }
-            tail++;
+            ss.write((char*)&_length, sizeof(int32_t));
+
+            ss.write(name.c_str(), _length);
+
+            char varser[sizeof(Variable)];
+            SerializeVariable(&item.second, varser);
+
+            ss.write(varser, sizeof(Variable));
+        }
+        //strpool
+
+        StreamWriteInt32(&ss, (int32_t)this->strpool_.size());
+
+        for (auto& item : this->strpool_) {
+
+            StreamWriteInt32(&ss, item.first);
+
+            string encode_str = c.to_bytes(item.second);
+            int32_t str_len = (int32_t)encode_str.size();
+            StreamWriteInt32(&ss, str_len);
+
+            ss.write(encode_str.c_str(), str_len);
         }
 
+        return ss.str();
     }
 
-    Variable::Variable()
-        : type(VariableType::Null), num(0.0f), str(wstring()), user_type_ptr(0)
-    {
-    }
 
-    Variable::Variable(const float& num) : Variable()
+    void Interpreter::Deserialize(const string& data)
     {
-        this->SetNumber(num);
-    }
+        stringstream ss(data);
+        std::wstring_convert<std::codecvt_utf8<wchar_t>> c;
+        
+        //variables
+        int32_t _length = StreamReadInt32(&ss);
 
-    Variable::Variable(const wstring& str) : Variable()
-    {
-        this->SetString(str);
-    }
-
-    Variable::Variable(const int& user_type_ptr) : Variable()
-    {
-        this->SetUserVarId(user_type_ptr);
-    }
-
-    void Variable::SetNumber(const float& num)
-    {
-        this->num = num;
-        this->type = VariableType::Numeric;
-    }
-
-    void Variable::SetString(const wstring& str)
-    {
-        this->str = str;
-        this->type = VariableType::String;
-    }
-
-    void Variable::SetUserVarId(const int& user_type_ptr)
-    {
-        this->user_type_ptr = user_type_ptr;
-        this->type = VariableType::UserVarId;
-    }
-
-    wstring Variable::GetSerializeData()
-    {
-        wstring str;
-        str += (wchar_t)(int)this->type + 48;
-        switch (this->type)
+        for (int32_t i = 0; i < _length; i++)
         {
-            case VariableType::Numeric:
-                str += to_wstring(this->num);
-                break;
-            case VariableType::UserVarId:
-                str += to_wstring(this->user_type_ptr);
-                break;
-            case VariableType::String:
-                str += this->str;
-                break;
-            default:
-                break;
+            int32_t var_name_len = StreamReadInt32(&ss);
+
+            //变量名长度不能超过64个字符
+            char name_buf[64] = { 0 };
+            ss.read(name_buf, var_name_len);
+            wstring name = c.from_bytes(name_buf);
+            
+            char var_buf[sizeof(Variable)];
+            ss.read(var_buf, sizeof(Variable));
+            Variable var = DeserializeVariable(var_buf);
+
+            this->SetVar(name, var);
         }
-        return str;
+
+        //strpool
+        
+        int32_t strpool_len = StreamReadInt32(&ss);
+
+        for (int32_t i = 0; i < strpool_len; i++)
+        {
+            int32_t str_ptr = StreamReadInt32(&ss);
+
+            int32_t str_len = StreamReadInt32(&ss);
+            char* str_buf = new char[str_len];
+            ss.read(str_buf, str_len);
+            wstring str = c.from_bytes(str_buf);
+            delete[] str_buf;
+
+            this->strpool_[str_ptr] = str;
+        }
     }
 
-    Variable Variable::DeserializeData(const wstring& _data)
+
+#pragma endregion
+
+#pragma region Variable
+    void SetVariableUndefined(Variable* var)
+    {
+        var->type = VARIABLETYPE_UNDEFINED;
+    }
+    void SetVariableNull(Variable* var)
+    {
+        var->type = VARIABLETYPE_NULL;
+        var->num = 0;
+    }
+
+    void SetVariableNumber(Variable* var, float num)
+    {
+        var->type = VARIABLETYPE_NUMBER;
+        var->num = num;
+    }
+
+    void SetVariableStrPtr(Variable* var, int ptr)
+    {
+        var->type = VARIABLETYPE_STRPTR;
+        var->str_ptr = ptr;
+    }
+
+    void SetVariableUserPtr(Variable* var, int user_ptr)
+    {
+        var->type = VARIABLETYPE_USERPTR;
+        var->user_ptr = user_ptr;
+    }
+    void SerializeVariable(Variable* var, char out[8])
+    {
+        memcpy(out, &var, sizeof(Variable));
+    }
+    Variable DeserializeVariable(char value[8])
     {
         Variable var;
-        wstring& data = const_cast<wstring&>(_data);
-        if (data[0] == (int)VariableType::Numeric + 48) {
-            var.SetNumber(stof(data.substr(1)));
-        }
-        else if (data[0] == (int)VariableType::UserVarId + 48) {
-            var.SetUserVarId(stoi(data.substr(1)));
-        }
-        else if (data[0] == (int)VariableType::String + 48) {
-            var.SetString(data.substr(1));
-        }
+        memcpy(&var, value, 8);
         return var;
     }
+#pragma endregion
 
 }
 

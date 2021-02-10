@@ -1,12 +1,15 @@
 #include <vector>
 #include <string>
 #include <map>
-#include <Windows.h>
+
 #include <malloc.h>
 
 #include "DLL.h"
-#include "Interpreter.h"
 
+
+#ifdef _WIN32 //DLL_MAIN
+#include <Windows.h>
+#endif
 
 using namespace std;
 using namespace jxcode;
@@ -16,12 +19,13 @@ struct InterpreterState
 {
     atomscript::Interpreter* interpreter;
     wchar_t last_error[1024];
+    string serialize_data;
+
+    LoadFileCallBack _loadfile;
+    FunctionCallBack _funcall;
 };
 
-static LoadFileCallBack _loadfile;
-static FunctionCallBack _funcall;
-
-static map<int, InterpreterState*> g_inters;
+map<int, InterpreterState*> g_inters;
 static int g_index = 0;
 
 static void SetErrorMessage(int id, const wchar_t* str);
@@ -30,26 +34,37 @@ static int kSuccess = 0;
 static int kNullResult = 1;
 static int kErrorMsg = 2;
 
-static InterpreterState* GetState(int id)
+
+inline static InterpreterState* GetState(int id)
 {
     if (g_inters.find(id) == g_inters.end()) {
         return nullptr;
     }
     return g_inters[id];
 }
-static void DelState(int id)
+inline static void DelState(int id)
 {
     if (GetState(id) != nullptr) {
         g_inters.erase(id);
     }
 }
-static InterpreterState* CheckAndGetState(int id) {
+inline static InterpreterState* CheckAndGetState(int id) {
     auto state = GetState(id);
     if (state == nullptr) {
         wchar_t str[] = L"not found interpreter instance";
         SetErrorMessage(id, str);
     }
     return state;
+}
+
+inline static Variable CheckAndGetVariable(int id, InterpreterState* inter, const wchar_t* name)
+{
+    auto var = inter->interpreter->GetVar(name);
+    if (var.type == VARIABLETYPE_UNDEFINED) {
+        wchar_t str[] = L"not found variable";
+        SetErrorMessage(id, str);
+    }
+    return var;
 }
 
 
@@ -66,27 +81,38 @@ static TokenGroup GetTokenGroup(const vector<Token>& tokens) {
     }
     return group;
 }
+static VariableGroup GetVariableGroup(const vector<Variable>& vars)
+{
+    VariableGroup group;
+    memset(&group, 0, sizeof(VariableGroup));
+    for (group.size = 0; group.size < vars.size(); group.size++)
+    {
+        group.vars[group.size] = vars[group.size];
+    }
+    return group;
+}
 
 static wstring OnLoadFile(int id, const wstring& path)
 {
     auto inter = GetState(id);
-    return _loadfile(id, path.c_str());
+    return inter->_loadfile(id, path.c_str());
 }
 
 static bool OnFuncall(int id,
     const intptr_t& user_type_id,
     const vector<Token>& domain,
     const vector<Token>& path,
-    const vector<Token>& params)
+    const vector<Variable>& params)
 {
     auto inter = GetState(id);
 
     intptr_t userid = user_type_id;
     TokenGroup _domain = GetTokenGroup(domain);
     TokenGroup _path = GetTokenGroup(path);
-    TokenGroup _param = GetTokenGroup(params);
+    
+    VariableGroup _param = GetVariableGroup(params);
 
-    return _funcall(id, userid, _domain, _path, _param);
+    return inter->_funcall(id, userid, _domain, _path, _param);
 }
 
 
@@ -102,12 +128,6 @@ static void SetErrorMessage(int id, const wchar_t* str)
     inter->last_error[1023] = L'\0';
 }
 
-int CALLAPI Initialize(LoadFileCallBack _loadfile_, FunctionCallBack _funcall_)
-{
-    _loadfile = _loadfile_;
-    _funcall = _funcall_;
-    return kSuccess;
-}
 int CALLAPI NewInterpreter(int* out_id)
 {
     auto id = ++g_index;
@@ -123,12 +143,29 @@ int CALLAPI NewInterpreter(int* out_id)
         [id](const intptr_t& user_type_id,
             const vector<Token>& domain,
             const vector<Token>& path,
-            const vector<Token>& params)->bool {
+            const vector<Variable>& params)->bool {
                 return OnFuncall(id, user_type_id, domain, path, params);
         });
     g_inters[g_index] = state;
     *out_id = g_index;
     return kSuccess;
+}
+
+int CALLAPI Initialize(int id, LoadFileCallBack _loadfile_, FunctionCallBack _funcall_)
+{
+    auto inter = GetState(id);
+    if (inter == nullptr) {
+        return kNullResult;
+    }
+    inter->_loadfile = _loadfile_;
+    inter->_funcall = _funcall_;
+    return kSuccess;
+}
+
+int CALLAPI SetCode(int id, wchar_t* str)
+{
+    
+    return 0;
 }
 
 int CALLAPI ResetState(int id)
@@ -140,8 +177,6 @@ int CALLAPI ResetState(int id)
     state->interpreter->Reset();
     return kSuccess;
 }
-
-
 
 void CALLAPI Terminate(int id)
 {
@@ -171,6 +206,22 @@ int CALLAPI ExecuteCode(int id, const wchar_t* code)
     return kSuccess;
 }
 
+int CALLAPI ExecuteFile(int id, const wchar_t* file)
+{
+    auto inter = CheckAndGetState(id);
+    if (inter == nullptr) {
+        return kNullResult;
+    }
+    try {
+        inter->interpreter->ExecuteProgram(file);
+    }
+    catch (atomscript::InterpreterException& e) {
+        SetErrorMessage(id, e.what().c_str());
+        return kErrorMsg;
+    }
+    return kSuccess;
+}
+
 int CALLAPI Next(int id)
 {
     auto inter = CheckAndGetState(id);
@@ -192,15 +243,124 @@ int CALLAPI Next(int id)
     return kSuccess;
 }
 
-int CALLAPI SerializeState(int id, wchar_t* out_ser_str)
+int CALLAPI GetProgramName(int id, wchar_t* out_name)
 {
     auto inter = CheckAndGetState(id);
     if (inter == nullptr) {
         return kNullResult;
     }
     try {
-        wstring ser_str = inter->interpreter->Serialize();
-        wcscpy(out_ser_str, const_cast<wchar_t*>(ser_str.c_str()));
+        auto name = inter->interpreter->program_name();
+        wcscpy(out_name, name.c_str());
+    }
+    catch (atomscript::InterpreterException& e) {
+        SetErrorMessage(id, e.what().c_str());
+        return kErrorMsg;
+    }
+    return kSuccess;
+}
+
+int CALLAPI GetVariable(int id, wchar_t* varname, Variable* out_var)
+{
+    auto inter = CheckAndGetState(id);
+    if (inter == nullptr) {
+        return kNullResult;
+    }
+    try {
+        auto var = inter->interpreter->GetVar(varname);
+        *out_var = var;
+    }
+    catch (atomscript::InterpreterException& e) {
+        SetErrorMessage(id, e.what().c_str());
+        return kErrorMsg;
+    }
+    return kSuccess;
+}
+
+int CALLAPI SetVariable(int id, wchar_t* varname, Variable var)
+{
+    auto inter = CheckAndGetState(id);
+    if (inter == nullptr) {
+        return kNullResult;
+    }
+    try {
+        inter->interpreter->SetVar(varname, var);
+    }
+    catch (atomscript::InterpreterException& e) {
+        SetErrorMessage(id, e.what().c_str());
+        return kErrorMsg;
+    }
+    return kSuccess;
+}
+
+int CALLAPI SetStringVariable(int id, wchar_t* varname, wchar_t* str)
+{
+    auto inter = CheckAndGetState(id);
+    if (inter == nullptr) {
+        return kNullResult;
+    }
+    try {
+        inter->interpreter->SetVar(varname, wstring(str));
+    }
+    catch (atomscript::InterpreterException& e) {
+        SetErrorMessage(id, e.what().c_str());
+        return kErrorMsg;
+    }
+    return kSuccess;
+}
+
+int CALLAPI SetString(int id, wchar_t* str, int* out_ptr)
+{
+    auto inter = CheckAndGetState(id);
+    if (inter == nullptr) {
+        return kNullResult;
+    }
+    try {
+        *out_ptr = inter->interpreter->NewStrPtr(str);
+    }
+    catch (atomscript::InterpreterException& e) {
+        SetErrorMessage(id, e.what().c_str());
+        return kErrorMsg;
+    }
+    return kSuccess;
+}
+
+int CALLAPI GetString(int id, int str_ptr, wchar_t* out_str)
+{
+    auto inter = CheckAndGetState(id);
+    if (inter == nullptr) {
+        return kNullResult;
+    }
+    try {
+        wstring* str = inter->interpreter->GetString(str_ptr);
+        wcscpy(out_str, str->c_str());
+    }
+    catch (atomscript::InterpreterException& e) {
+        SetErrorMessage(id, e.what().c_str());
+        return kErrorMsg;
+    }
+    return kSuccess;
+}
+
+int CALLAPI DelVar(int id, const wchar_t* varname)
+{
+    auto inter = CheckAndGetState(id);
+    if (inter == nullptr) {
+        return kNullResult;
+    }
+    inter->interpreter->DelVar(varname);
+    return kSuccess;
+}
+
+int CALLAPI SerializeState(int id, int* out_length)
+{
+    auto inter = CheckAndGetState(id);
+    if (inter == nullptr) {
+        return kNullResult;
+    }
+    try {
+        inter->serialize_data = inter->interpreter->Serialize();
+        *out_length = inter->serialize_data.size();
     }
     catch (atomscript::InterpreterException& e) {
         SetErrorMessage(id, e.what().c_str());
@@ -210,14 +370,19 @@ int CALLAPI SerializeState(int id, wchar_t* out_ser_str)
     return kSuccess;
 }
 
-int CALLAPI DeserializeState(int id, wchar_t* deser_str)
+int CALLAPI TakeSerializationData(int id, char* ser_buf)
 {
     auto inter = CheckAndGetState(id);
     if (inter == nullptr) {
         return kNullResult;
     }
     try {
-        inter->interpreter->Deserialize(deser_str);
+        if (inter->serialize_data.empty()) {
+            SetErrorMessage(id, L"serialize data is empty");
+            return kErrorMsg;
+        }
+        strcpy(ser_buf, inter->serialize_data.c_str());
+        inter->serialize_data.clear();
     }
     catch (atomscript::InterpreterException& e) {
         SetErrorMessage(id, e.what().c_str());
@@ -226,27 +391,30 @@ int CALLAPI DeserializeState(int id, wchar_t* deser_str)
     return kSuccess;
 }
 
-int CALLAPI GetStateStatus(int id, int* exeptr, int* var_counts)
+int CALLAPI DeserializeState(int id, char* deser_buf)
 {
     auto inter = CheckAndGetState(id);
     if (inter == nullptr) {
         return kNullResult;
     }
-    *exeptr = inter->interpreter->line_num();
-    *var_counts = (int)inter->interpreter->variables().size();
+    try {
+        inter->interpreter->Deserialize(deser_buf);
+    }
+    catch (atomscript::InterpreterException& e) {
+        SetErrorMessage(id, e.what().c_str());
+        return kErrorMsg;
+    }
     return kSuccess;
 }
 
-int CALLAPI ReleaseSerializeStr(wchar_t* ptr)
-{
-    delete[] ptr;
-    return kSuccess;
-}
+
 
 void CALLAPI GetLibVersion(wchar_t* out)
 {
-    wcscpy(out, L"JxCode.Lang.AtomScript 1.0");
+    wcscpy(out, L"JxCode.Lang.AtomScript 1.2");
 }
+
+#ifdef _WIN32
 
 BOOL APIENTRY DllMain(
     HANDLE hModule,             // DLL模块的句柄
@@ -267,3 +435,4 @@ BOOL APIENTRY DllMain(
     return TRUE;            //返回TRUE,表示成功执行本函数
 }
 
+#endif

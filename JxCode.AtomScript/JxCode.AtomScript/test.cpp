@@ -31,21 +31,22 @@ int main() {
     using namespace jxcode::atomscript;
 
     wstring dir(L"C:\\Users\\Jayshonyves\\Desktop\\");
-    wstring path(L"C:\\Users\\Jayshonyves\\Desktop\\AtomScript.txt");
+    wstring path(L"C:\\Users\\Jayshonyves\\Desktop\\eazytest.txt");
 
     int id = 0;
+    NewInterpreter(&id);
     Initialize(
+        id,
         [](int id, const wchar_t* path)->wchar_t* {
             wstring dir(L"C:\\Users\\Jayshonyves\\Desktop\\" + wstring(path));
             wstring* str = new wstring(readAllText(dir));
             wcout << dir << endl;
             return const_cast<wchar_t*>(str->c_str());
         },
-        [](int id, intptr_t user_type_id, TokenGroup domain, TokenGroup path, TokenGroup params)->int {
+        [](int id, intptr_t user_type_id, TokenGroup domain, TokenGroup path, VariableGroup params)->int {
             wcout << user_type_id << endl;
             return true;
-        })
-        ;
+        });
 
     ExecuteCode(id, L"jumpfile \"def.txt\"");
     Next(id);

@@ -9,9 +9,15 @@
 #include "Token.h"
 #include "OpCommand.h"
 
+#define VARIABLETYPE_UNDEFINED -1
+#define VARIABLETYPE_NULL 0
+#define VARIABLETYPE_NUMBER 1
+#define VARIABLETYPE_STRPTR 2
+#define VARIABLETYPE_USERPTR 3
 
 namespace jxcode::atomscript
 {
+    using std::string;
     using std::wstring;
     using std::map;
     using std::vector;
@@ -19,40 +25,26 @@ namespace jxcode::atomscript
     using std::function;
     using lexer::Token;
 
-    enum class VariableType : int
+    struct Variable
     {
-        Null,
-        Numeric,
-        String,
-        UserVarId
+        int32_t type;
+        union {
+            float num;
+            int32_t str_ptr;
+            int32_t user_ptr;
+        };
     };
+    void SetVariableUndefined(Variable* var);
+    void SetVariableNull(Variable* var);
+    void SetVariableNumber(Variable* var, float num);
+    void SetVariableStrPtr(Variable* var, int ptr);
+    void SetVariableUserPtr(Variable* var, int user_ptr);
 
-    class Variable
-    {
-    public:
-        VariableType type;
-        float num;
-        wstring str;
-        int user_type_ptr;
-    public:
-        Variable();
-        Variable(const float& num);
-        Variable(const wstring& str);
-        Variable(const int& user_type_ptr);
-    public:
-        void SetNumber(const float& num);
-        void SetString(const wstring& str);
-        void SetUserVarId(const int& user_type_ptr);
-    public:
-        wstring GetSerializeData();
-        static Variable DeserializeData(const wstring& data);
-    };
+    void SerializeVariable(Variable* var, char out[8]);
+    Variable DeserializeVariable(char value[8]);
 
     class InterpreterException
     {
-    public:
-        static std::wstring ParserException;
-        static std::wstring RuntimeException;
     protected:
         std::wstring message_;
         lexer::Token token_;
@@ -67,26 +59,30 @@ namespace jxcode::atomscript
     class Interpreter
     {
     public:
-        using LoadFileCallBack = function<wstring(const wstring& path)>;
+        using LoadFileCallBack = function<wstring(const wstring& program_name_)>;
         //如果调用对象为静态对象（无法在变量表中找到）则user_type_ptr为0
         using FuncallCallBack = function<bool(
-            const intptr_t& user_type_ptr, 
+            const intptr_t& user_ptr, 
             const vector<Token>& domain,
             const vector<Token>& path,
-            const vector<Token>& params)>;
+            const vector<Variable>& params)>;
     protected:
         LoadFileCallBack _loadfile_;
         FuncallCallBack _funcall_;
+
+        wstring program_name_;
 
         vector<OpCommand> commands_;
         int32_t exec_ptr_;
         map<wstring, size_t> labels_;
 
-        map<wstring, Variable*> variables_;
+        map<wstring, Variable> variables_;
+        map<int32_t, wstring> strpool_;
     public:
         int32_t line_num() const;
         size_t opcmd_count() const;
-        map<wstring, Variable*>& variables();
+        const wstring& program_name() const;
+        map<wstring, Variable>* variables();
     public:
         Interpreter(
             LoadFileCallBack _loadfile_,
@@ -101,15 +97,22 @@ namespace jxcode::atomscript
         void SetVar(const wstring& name, const int& user_id);
         void SetVar(const wstring& name, const Variable& var);
         void DelVar(const wstring& name);
-        Variable* GetVar(const wstring& name);
+        Variable GetVar(const wstring& name);
+    public:
+        int GetStrPtr(const wstring& str);
+        int NewStrPtr(const wstring& str);
+        wstring* GetString(const int& strptr);
+        void GCollect();
     public:
         Interpreter* ExecuteCode(const wstring& code);
-        Interpreter* Next();
+        Interpreter* ExecuteProgram(const wstring& program_name_);
+        //返回是否运行结束
+        bool Next();
         
         void Reset();
 
-        wstring Serialize();
-        void Deserialize(const wstring& text);
+        string Serialize();
+        void Deserialize(const string& data);
     };
 }
 

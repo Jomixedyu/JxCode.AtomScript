@@ -14,7 +14,14 @@ namespace JxCode.AtomLang
 
         }
     }
-
+    public class NickAttribute : Attribute
+    {
+        public string NickName { get; set; }
+        public NickAttribute(string name)
+        {
+            this.NickName = name;
+        }
+    }
     public static class Sys
     {
         public static void Print(string str)
@@ -50,20 +57,20 @@ namespace JxCode.AtomLang
         }
 
         [return: MarshalAs(UnmanagedType.LPWStr)]
-        private delegate string LoadfileCallBack([MarshalAs(UnmanagedType.LPWStr)] string path);
-        private delegate int FunctionCallBack(int id, TokenGroup doman, TokenGroup path, TokenGroup param);
-        private delegate void ErrorInfoCallBack([MarshalAs(UnmanagedType.LPWStr)] string errorInfo);
+        private delegate string LoadfileCallBack(int id, [MarshalAs(UnmanagedType.LPWStr)] string path);
+        private delegate int FunctionCallBack(int id, int var_id, TokenGroup doman, TokenGroup path, TokenGroup param);
 
-        const string DLL_NAME = @"E:\JxCode.AtomScript\JxCode.AtomScript\x64\DLLDebug\JxCode.AtomScript.dll";
+        const string DLL_NAME = @"JxCode.AtomScript.dll";
 
         [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
         private extern static void GetErrorMessage(int id, StringBuilder sb);
         [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
         private extern static int Initialize(
             LoadfileCallBack loadfile,
-            FunctionCallBack funcall,
-            ErrorInfoCallBack errorinfo,
-            ref int id);
+            FunctionCallBack funcall);
+
+        [DllImport(DLL_NAME)]
+        private extern static int NewInterpreter(ref int id);
         [DllImport(DLL_NAME)]
         private extern static void Terminate(int id);
         [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
@@ -72,6 +79,26 @@ namespace JxCode.AtomLang
         private extern static int ExecuteCode(int id, string code);
         [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
         private extern static int Next(int id);
+
+        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
+        private extern static int GetVarType(int id, string varname, ref int out_type);
+        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
+        private extern static int GetVarString(int id, string varname, StringBuilder out_str);
+        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
+        private extern static int GetVarNumber(int id, string varname, ref float out_num);
+        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
+        private extern static int GetVarUser(int id, string varname, ref int out_userid);
+
+        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
+        private extern static int SetVarString(int id, string varname, string value);
+        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
+        private extern static int SetVarNum(int id, string varname, float num);
+        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
+        private extern static int SetVarUser(int id, string varname, int userid);
+
+        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
+        private extern static int DelVar(int id, string varname);
+
         [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
         private extern static int SerializeState(int id, StringBuilder ser_str);
         [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
@@ -83,26 +110,211 @@ namespace JxCode.AtomLang
         [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
         private extern static void GetLibVersion(StringBuilder str);
 
+        private const int kSuccess = 0;
+        private const int kNullResult = 1;
+        private const int kErrorMsg = 2;
+
+        public const string __return = "__return";
+
+        public const int kRunBreak = 0;
+        public const int kRunNext = 1;
+
+        public enum VariableType : int
+        {
+            Null,
+            Numeric,
+            String,
+            UserVarId
+        }
+        public struct Variable
+        {
+            public VariableType type;
+            public float num;
+            public string str;
+            public int user_type_ptr;
+        }
+
+
+
+        private static Dictionary<int, Interpreter> interstates = new Dictionary<int, Interpreter>();
+
+        private static string OnLoadFile(int id, string path)
+        {
+            return interstates[id].OnLoadFile(path);
+        }
+        private static int OnFuncall(int id, int userid, TokenGroup domain, TokenGroup path, TokenGroup param)
+        {
+            return interstates[id].OnFuncall(userid, domain, path, param);
+        }
+
+
+
+        static Interpreter()
+        {
+            Initialize(OnLoadFile, OnFuncall);
+        }
+
 
         private int id;
+        public int Id { get => this.id; }
         private Func<string, string> loadfile;
 
-        private Dictionary<int, object> insts = new Dictionary<int, object>();
+        //private Dictionary<Type, Dictionary<string, MethodInfo>> typeTable = new Dictionary<Type, Dictionary<string, MethodInfo>>();
+        //public Interpreter AddType(Type type)
+        //{
+        //    if (this.typeTable.ContainsKey(type))
+        //    {
+        //        return this;
+        //    }
+        //    var methodTable = new Dictionary<string, MethodInfo>();
+        //    this.typeTable.Add(type, methodTable);
+        //    var methods = type.GetMethods();
+        //    foreach (var item in methods)
+        //    {
+        //        methodTable.Add(item.Name, item);
+        //        //方法别名
+        //        if (Attribute.IsDefined(item, typeof(NickAttribute)))
+        //        {
+        //            var nick = (NickAttribute)Attribute.GetCustomAttribute(item, typeof(NickAttribute));
+        //            methodTable.Add(nick.NickName, item);
+        //        }
+        //    }
+        //    return this;
+        //}
 
-        private object GetVar(int id)
+        private Dictionary<int, object> insts = new Dictionary<int, object>();
+        private int instcount = 0;
+        private int GetNewLocalVarId()
+        {
+            return ++this.instcount;
+        }
+        private void SetLocalVar(int userid, object o)
+        {
+            if (this.insts.ContainsKey(userid))
+            {
+                this.insts[userid] = o;
+            }
+            else
+            {
+                this.insts.Add(userid, o);
+            }
+        }
+        private int AddLocalVar(object o)
+        {
+            ++this.instcount;
+            this.insts.Add(this.instcount, o);
+            return this.instcount;
+        }
+        private void DelLocalVar(int id)
+        {
+            if (this.insts.ContainsKey(id))
+            {
+                this.insts.Remove(id);
+            }
+        }
+
+        private object GetLocalVar(int id)
         {
             object o = null;
             this.insts.TryGetValue(id, out o);
             return o;
+        }
+        public Variable GetVar(string name)
+        {
+            int type = 0;
+            int r = GetVarType(this.id, name, ref type);
+            if (r != kSuccess)
+            {
+                throw new InterpreterException(GetErrorMessage());
+            }
+            Variable v = new Variable();
+            v.type = (VariableType)type;
+            switch (v.type)
+            {
+                case VariableType.Null:
+                    break;
+                case VariableType.Numeric:
+                    GetVarNumber(this.id, name, ref v.num);
+                    break;
+                case VariableType.String:
+                    StringBuilder sb = new StringBuilder(1024);
+                    GetVarString(this.id, name, sb);
+                    v.str = sb.ToString();
+                    break;
+                case VariableType.UserVarId:
+                    GetVarUser(this.id, name, ref v.user_type_ptr);
+                    break;
+                default:
+                    break;
+            }
+            return v;
+        }
+        private void DelUserVar(string name)
+        {
+            int type = 0;
+            int r = GetVarType(this.id, name, ref type);
+            if (r == kSuccess)
+            {
+                if (type == (int)VariableType.UserVarId)
+                {
+                    int cuser_id = 0;
+                    GetVarUser(this.id, name, ref cuser_id);
+                    this.DelLocalVar(cuser_id);
+                }
+            }
+        }
+        public void SetVar(string name, float num)
+        {
+            DelUserVar(name);
+            SetVarNum(this.id, name, num);
+        }
+        public void SetVar(string name, string str)
+        {
+            DelUserVar(name);
+            SetVarString(this.id, name, str);
+        }
+        public void SetVar(string name, object obj)
+        {
+            int type = 0;
+            int r = GetVarType(this.id, name, ref type);
+            if (r == kNullResult)
+            {
+                //为空则新建
+                int userid = this.AddLocalVar(obj);
+                SetVarUser(this.id, name, userid);
+            }
+            else
+            {
+                //有该名字的变量，进行类型判断
+                if (type == (int)VariableType.UserVarId)
+                {
+                    //如果是userid获取
+                    int cuser_id = 0;
+                    GetVarUser(this.id, name, ref cuser_id);
+                    this.SetLocalVar(cuser_id, obj);
+                    SetVarUser(this.id, name, cuser_id);
+                }
+                else
+                {
+                    //其他类型同名变量，获取一个变量id
+                    int cu_id = this.GetNewLocalVarId();
+                    this.SetLocalVar(cu_id, obj);
+                    SetVarUser(this.id, name, cu_id);
+                }
+            }
         }
 
         public Interpreter(Func<string, string> loadfile)
         {
             int _id = 0;
             this.loadfile = loadfile;
-            Initialize(OnLoadFile, OnFuncall, OnError, ref _id);
+
+            NewInterpreter(ref _id);
             this.id = _id;
+
+            interstates.Add(_id, this);
         }
+
         private MethodInfo GetSerializeMethodInfo(object obj)
         {
             if (obj == null)
@@ -129,19 +341,19 @@ namespace JxCode.AtomLang
         private MethodInfo GetDeserializeMethodInfo(string typePath)
         {
             Type type = Type.GetType(typePath);
-            if(type == null)
+            if (type == null)
             {
                 return null;
             }
             try
             {
                 MethodInfo mi = type.GetMethod("Deserialize");
-                if(mi == null)
+                if (mi == null)
                 {
                     return null;
                 }
                 var parms = mi.GetParameters();
-                if(parms.Length != 1 || parms[0].ParameterType != typeof(Stream))
+                if (parms.Length != 1 || parms[0].ParameterType != typeof(Stream))
                 {
                     return null;
                 }
@@ -240,15 +452,15 @@ namespace JxCode.AtomLang
             TokenInfo methodNameToken = path.tokens[path.size - 1];
             string method = (path.tokens[path.size - 1].value);
 
-            string[] @params = new string[param.size];
-            for (int i = 0; i < @params.Length; i++)
+            string[] paramstrs = new string[param.size];
+            for (int i = 0; i < paramstrs.Length; i++)
             {
-                @params[i] = (param.tokens[i].value);
+                paramstrs[i] = (param.tokens[i].value);
             }
 
             Type type = null;
             MethodInfo methodInfo = null;
-            object inst = this.GetVar(userid);
+            object inst = this.GetLocalVar(userid);
 
 
             if (userid != 0)
@@ -258,7 +470,7 @@ namespace JxCode.AtomLang
                 {
                     inst = GetSubObject(inst, inst.GetType(), paths[i]);
                 }
-
+                type = inst.GetType();
             }
             else
             {
@@ -279,26 +491,90 @@ namespace JxCode.AtomLang
                     type = inst.GetType();
                 }
             }
+            //如果没有按方法名找到那就用别名找
             methodInfo = type.GetMethod(method);
 
             if (methodInfo == null)
             {
-                throw new InterpreterException(GetExceptionInfo(methodNameToken, "未找到方法"));
+                //找别名
+                var methodinfos = type.GetMethods();
+                foreach (var item in methodinfos)
+                {
+                    if (Attribute.IsDefined(item, typeof(NickAttribute)))
+                    {
+                        NickAttribute nick = (NickAttribute)Attribute.GetCustomAttribute(item, typeof(NickAttribute));
+                        if (nick.NickName == method)
+                        {
+                            //别名和方法名匹配
+                            methodInfo = item;
+                            break;
+                        }
+                    }
+                }
+                if (methodInfo == null)
+                {
+                    //别名查找还是为空则抛出异常
+                    throw new InterpreterException(GetExceptionInfo(methodNameToken, "未找到方法"));
+                }
             }
 
             ParameterInfo[] paramTypes = methodInfo.GetParameters();
             object[] _params = new object[paramTypes.Length];
 
-            for (int i = 0; i < _params.Length; i++)
+            int realParamPos = 0;
+            int inToRealParamOffset = 0;
+
+            bool isSpecialMethod = false;
+            if (paramTypes.Length >= 2)
             {
-                if (@params.Length > i)
-                    _params[i] = @params[i];
+                if (paramTypes[0].ParameterType == typeof(Interpreter)
+                    && paramTypes[1].ParameterType == typeof(bool).MakeByRefType())
+                {
+                    isSpecialMethod = true;
+                    realParamPos = 2;
+                    inToRealParamOffset = -2;
+                    _params[0] = this;
+                    _params[1] = true;
+                }
+            }
+            for (; realParamPos < _params.Length; realParamPos++)
+            {
+                //没有超过传入的参数数量
+                if (paramstrs.Length > realParamPos + inToRealParamOffset)
+                {
+                    int inParamsPos = realParamPos + inToRealParamOffset;
+                    var _p = Convert.ChangeType(paramstrs[inParamsPos], paramTypes[realParamPos].ParameterType);
+                    _params[realParamPos] = _p;
+                }
             }
 
             object rst = methodInfo.Invoke(inst, _params);
-
-            return 1;
+            if (rst != null)
+            {
+                Type retType = rst.GetType();
+                if (retType == typeof(string))
+                {
+                    this.SetVar(__return, (string)rst);
+                }
+                else if (retType.IsPrimitive)
+                {
+                    this.SetVar(__return, Convert.ToSingle(rst));
+                }
+                else
+                {
+                    this.SetVar(__return, rst);
+                }
+            }
+            if (isSpecialMethod && (bool)_params[1] == false)
+            {
+                return kRunBreak;
+            }
+            else
+            {
+                return kRunNext;
+            }
         }
+
         private object GetSubObject(object obj, Type t, string name)
         {
             Type type = t;
@@ -321,11 +597,6 @@ namespace JxCode.AtomLang
                 return pi.GetValue(obj, null);
             }
             return null;
-        }
-
-        private void OnError(string info)
-        {
-            throw new InterpreterException(info);
         }
 
         private string GetErrorMessage()
@@ -367,6 +638,7 @@ namespace JxCode.AtomLang
             }
             disaposed = true;
             Terminate(this.id);
+            interstates.Remove(this.id);
             GC.SuppressFinalize(this);
         }
     }
