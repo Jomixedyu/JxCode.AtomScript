@@ -38,7 +38,7 @@ extern "C" {
     DLLEXPORT void CALLAPI GetErrorMessage(int id, wchar_t* out_str);
     DLLEXPORT int CALLAPI NewInterpreter(int* id);
     DLLEXPORT int CALLAPI Initialize(int id, LoadFileCallBack _loadfile_, FunctionCallBack _funcall_);
-    DLLEXPORT int CALLAPI SetCode(int id, wchar_t* str);
+
     DLLEXPORT void CALLAPI Terminate(int id);
     DLLEXPORT int CALLAPI ResetState(int id);
     DLLEXPORT int CALLAPI ResetMemory(int id);
@@ -50,10 +50,10 @@ extern "C" {
     DLLEXPORT int CALLAPI GetVariable(int id, wchar_t* varname, Variable* out_var);
     DLLEXPORT int CALLAPI SetVariable(int id, wchar_t* varname, Variable var);
     DLLEXPORT int CALLAPI SetStringVariable(int id, wchar_t* varname, wchar_t* str);
-    DLLEXPORT int CALLAPI SetString(int id, wchar_t* str, int* out_ptr);
+    DLLEXPORT int CALLAPI NewString(int id, wchar_t* str, int* out_ptr);
     DLLEXPORT int CALLAPI GetString(int id, int str_ptr, wchar_t* out_str);
 
-    DLLEXPORT int CALLAPI DelVar(int id, const wchar_t* varname);
+    DLLEXPORT int CALLAPI DelVariable(int id, const wchar_t* varname);
 
     DLLEXPORT int CALLAPI SerializeState(int id, int* out_length);
     DLLEXPORT int CALLAPI TakeSerializationData(int id, char* ser_buf);

@@ -162,12 +162,6 @@ int CALLAPI Initialize(int id, LoadFileCallBack _loadfile_, FunctionCallBack _fu
     return kSuccess;
 }
 
-int CALLAPI SetCode(int id, wchar_t* str)
-{
-    
-    return 0;
-}
-
 int CALLAPI ResetState(int id)
 {
     auto state = GetState(id);
@@ -302,7 +296,7 @@ int CALLAPI SetStringVariable(int id, wchar_t* varname, wchar_t* str)
     return kSuccess;
 }
 
-int CALLAPI SetString(int id, wchar_t* str, int* out_ptr)
+int CALLAPI NewString(int id, wchar_t* str, int* out_ptr)
 {
     auto inter = CheckAndGetState(id);
     if (inter == nullptr) {
@@ -335,7 +329,7 @@ int CALLAPI GetString(int id, int str_ptr, wchar_t* out_str)
     return kSuccess;
 }
 
-int CALLAPI DelVar(int id, const wchar_t* varname)
+int CALLAPI DelVariable(int id, const wchar_t* varname)
 {
     auto inter = CheckAndGetState(id);
     if (inter == nullptr) {
