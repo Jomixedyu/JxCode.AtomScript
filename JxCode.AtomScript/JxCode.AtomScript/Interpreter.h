@@ -39,7 +39,7 @@ namespace jxcode::atomscript
         using LoadFileCallBack = function<wstring(const wstring& program_name_)>;
         //如果调用对象为静态对象（无法在变量表中找到）则user_type_ptr为0
         using FuncallCallBack = function<bool(
-            const intptr_t& user_ptr, 
+            const int32_t& user_ptr, 
             const vector<Token>& domain,
             const vector<Token>& path,
             const vector<Variable>& params)>;

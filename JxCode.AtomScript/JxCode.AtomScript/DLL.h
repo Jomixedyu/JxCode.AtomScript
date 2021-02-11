@@ -19,13 +19,13 @@ typedef struct
 
 typedef struct
 {
-    TokenInfo tokens[8];
+    TokenInfo* tokens;
     int size;
 } TokenGroup;
 
 typedef struct
 {
-    Variable vars[8];
+    Variable* vars;
     int size;
 } VariableGroup;
 
@@ -42,22 +42,21 @@ extern "C" {
     DLLEXPORT void CALLAPI Terminate(int id);
     DLLEXPORT int CALLAPI ResetState(int id);
     DLLEXPORT int CALLAPI ResetMemory(int id);
+
     DLLEXPORT int CALLAPI ExecuteProgram(int id, const wchar_t* file);
     DLLEXPORT int CALLAPI Next(int id);
 
-    DLLEXPORT int CALLAPI GetProgramName(int id, wchar_t* out_name);
-
     DLLEXPORT int CALLAPI GetVariable(int id, wchar_t* varname, Variable* out_var);
     DLLEXPORT int CALLAPI SetVariable(int id, wchar_t* varname, Variable var);
+    DLLEXPORT int CALLAPI DelVariable(int id, const wchar_t* varname);
     DLLEXPORT int CALLAPI SetStringVariable(int id, wchar_t* varname, wchar_t* str);
     DLLEXPORT int CALLAPI NewString(int id, wchar_t* str, int* out_ptr);
     DLLEXPORT int CALLAPI GetString(int id, int str_ptr, wchar_t* out_str);
+    DLLEXPORT int CALLAPI GetStringLength(int id, int str_ptr, int* out_length);
 
-    DLLEXPORT int CALLAPI DelVariable(int id, const wchar_t* varname);
-
+    DLLEXPORT int CALLAPI GetProgramName(int id, wchar_t* out_name);
     DLLEXPORT int CALLAPI SerializeState(int id, int* out_length);
     DLLEXPORT int CALLAPI TakeSerializationData(int id, char* ser_buf);
-
     DLLEXPORT int CALLAPI DeserializeState(int id, char* deser_buf, int buf_size);
 
     DLLEXPORT void CALLAPI GetLibVersion(wchar_t* out);

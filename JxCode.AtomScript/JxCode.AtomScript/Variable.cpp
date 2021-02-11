@@ -7,6 +7,12 @@ void SetVariableUndefined(Variable* var)
     var->num = 0;
 }
 
+void SetVariableNull(Variable* var)
+{
+    var->type = VARIABLETYPE_NULL;
+    var->num = 0;
+}
+
 void SetVariableNumber(Variable* var, float num)
 {
     var->type = VARIABLETYPE_NUMBER;

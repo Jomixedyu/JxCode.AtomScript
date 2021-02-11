@@ -43,7 +43,7 @@ int main() {
             wcout << dir << endl;
             return const_cast<wchar_t*>(str->c_str());
         },
-        [](int id, intptr_t user_type_id, TokenGroup domain, TokenGroup path, VariableGroup params)->int {
+        [](int id, int user_type_id, TokenGroup domain, TokenGroup path, VariableGroup params)->int {
             wcout << user_type_id << endl;
             return false;
         });
@@ -57,5 +57,8 @@ int main() {
     TakeSerializationData(id, buf);
 
     DeserializeState(id, buf, length);
-    int d = 1;
+    
+    wchar_t wc[32];
+    GetProgramName(id, wc);
+
 }

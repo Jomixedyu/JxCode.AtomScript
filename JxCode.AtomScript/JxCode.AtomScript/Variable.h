@@ -3,9 +3,10 @@
 #define _JXCODE_ATOMSCRIPT_VARIABLE_H
 
 #define VARIABLETYPE_UNDEFINED 0
-#define VARIABLETYPE_NUMBER 1
-#define VARIABLETYPE_STRPTR 2
-#define VARIABLETYPE_USERPTR 3
+#define VARIABLETYPE_NULL 1
+#define VARIABLETYPE_NUMBER 2
+#define VARIABLETYPE_STRPTR 3
+#define VARIABLETYPE_USERPTR 4
 
 typedef struct Variable
 {
@@ -17,6 +18,7 @@ typedef struct Variable
 } Variable;
 
 void SetVariableUndefined(Variable* var);
+void SetVariableNull(Variable* var);
 void SetVariableNumber(Variable* var, float num);
 void SetVariableStrPtr(Variable* var, int ptr);
 void SetVariableUserPtr(Variable* var, int user_ptr);

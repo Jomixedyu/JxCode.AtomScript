@@ -30,9 +30,9 @@ static int g_index = 0;
 
 static void SetErrorMessage(int id, const wchar_t* str);
 
-static int kSuccess = 0;
-static int kNullResult = 1;
-static int kErrorMsg = 2;
+inline static int kSuccess = 0;
+inline static int kNullResult = 1;
+inline static int kErrorMsg = 2;
 
 
 inline static InterpreterState* GetState(int id)
@@ -68,28 +68,27 @@ inline static Variable CheckAndGetVariable(int id, InterpreterState* inter, cons
 }
 
 
-static TokenGroup GetTokenGroup(const vector<Token>& tokens) {
-    TokenGroup group;
-    memset(&group, 0, sizeof(TokenGroup));
-    for (group.size = 0; group.size < tokens.size(); group.size++)
-    {
-        TokenInfo info;
-        info.line = tokens[group.size].line;
-        info.position = tokens[group.size].position;
-        info.value = const_cast<wchar_t*>(tokens[group.size].value->c_str());
-        group.tokens[group.size] = info;
-    }
-    return group;
-}
-static VariableGroup GetVariableGroup(const vector<Variable>& vars)
+inline static void SetTokenGroup(const vector<Token>& tokens, TokenGroup* group)
 {
-    VariableGroup group;
-    memset(&group, 0, sizeof(VariableGroup));
-    for (group.size = 0; group.size < vars.size(); group.size++)
+    for (int i = 0; i < tokens.size(); i++)
     {
-        group.vars[group.size] = vars[group.size];
+        const Token& token_item = tokens[i];
+        TokenInfo& item = group->tokens[i];
+        
+        item.line = token_item.line;
+        item.position = token_item.position;
+        item.value = token_item.value.get()->c_str();
     }
-    return group;
+    group->size = tokens.size();
+}
+inline static void SetVariableGroup(const vector<Variable>& vars, VariableGroup* group)
+{
+    for (int i = 0; i < vars.size(); i++)
+    {
+        group->vars[i] = vars[i];
+    }
+
+    group->size = vars.size();
 }
 
 static wstring OnLoadFile(int id, const wstring& path)
@@ -106,13 +105,24 @@ static bool OnFuncall(int id,
 {
     auto inter = GetState(id);
 
-    intptr_t userid = user_type_id;
-    TokenGroup _domain = GetTokenGroup(domain);
-    TokenGroup _path = GetTokenGroup(path);
-    
-    VariableGroup _param = GetVariableGroup(params);
+    int userid = user_type_id;
 
-    return inter->_funcall(id, userid, _domain, _path, _param);
+    TokenGroup _domain;
+    TokenInfo _domain_token_info[8];
+    _domain.tokens = _domain_token_info;
+    SetTokenGroup(domain, &_domain);
+
+    TokenGroup _path;
+    TokenInfo _path_token_info[8];
+    _path.tokens = _path_token_info;
+    SetTokenGroup(path, &_path);
+    
+    VariableGroup _var;
+    Variable _var_infos[16];
+    _var.vars = _var_infos;
+    SetVariableGroup(params, &_var);
+
+    return inter->_funcall(id, userid, _domain, _path, _var);
 }
 
 
@@ -140,7 +150,7 @@ int CALLAPI NewInterpreter(int* out_id)
         [id](const wstring& path)->wstring {
             return OnLoadFile(id, path);
         },
-        [id](const intptr_t& user_type_id,
+        [id](const int& user_type_id,
             const vector<Token>& domain,
             const vector<Token>& path,
             const vector<Variable>& params)->bool {
@@ -321,6 +331,22 @@ int CALLAPI GetString(int id, int str_ptr, wchar_t* out_str)
     try {
         wstring* str = inter->interpreter->GetString(str_ptr);
         wcscpy(out_str, str->c_str());
+    }
+    catch (atomscript::InterpreterException& e) {
+        SetErrorMessage(id, e.what().c_str());
+        return kErrorMsg;
+    }
+    return kSuccess;
+}
+
+int CALLAPI GetStringLength(int id, int str_ptr, int* out_length)
+{
+    auto inter = CheckAndGetState(id);
+    if (inter == nullptr) {
+        return kNullResult;
+    }
+    try {
+        *out_length = inter->interpreter->GetString(str_ptr)->size() + 1;
     }
     catch (atomscript::InterpreterException& e) {
         SetErrorMessage(id, e.what().c_str());

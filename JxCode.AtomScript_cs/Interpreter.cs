@@ -14,14 +14,47 @@ namespace JxCode.AtomLang
 
         }
     }
-    public class NickAttribute : Attribute
+
+    public enum VariableType : int
     {
-        public string NickName { get; set; }
-        public NickAttribute(string name)
-        {
-            this.NickName = name;
-        }
+        Undefined,
+        Null,
+        Number,
+        Strptr,
+        Userptr,
     }
+    [StructLayout(LayoutKind.Explicit)]
+    public unsafe struct Variable
+    {
+        [FieldOffset(0)]
+        public VariableType type;
+        [FieldOffset(1)]
+        public float num;
+        [FieldOffset(1)]
+        public int ptr;
+    }
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    public unsafe struct TokenInfo
+    {
+        public char* value;
+        public int line;
+        public int position;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public unsafe struct TokenGroup
+    {
+        public TokenInfo* tokens;
+        public int size;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public unsafe struct VariableGroup
+    {
+        public Variable* vars;
+        public int size;
+    }
+
     public static class Sys
     {
         public static void Print(string str)
@@ -40,73 +73,58 @@ namespace JxCode.AtomLang
 
     public unsafe class Interpreter : IDisposable
     {
-        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-        public struct TokenInfo
-        {
-            //[MarshalAs(UnmanagedType.LPWStr)]
-            public string value;
-            public int line;
-            public int position;
-        }
-        [StructLayout(LayoutKind.Sequential)]
-        public struct TokenGroup
-        {
-            [MarshalAs(UnmanagedType.ByValArray, SizeConst = 8)]
-            public TokenInfo[] tokens;
-            public int size;
-        }
+        const string DLL_NAME = @"JxCode.AtomScript.dll";
 
         [return: MarshalAs(UnmanagedType.LPWStr)]
         private delegate string LoadfileCallBack(int id, [MarshalAs(UnmanagedType.LPWStr)] string path);
-        private delegate int FunctionCallBack(int id, int var_id, TokenGroup doman, TokenGroup path, TokenGroup param);
+        private delegate int FunctionCallBack(int id, int userptr, TokenGroup doman, TokenGroup path, VariableGroup param);
 
-        const string DLL_NAME = @"JxCode.AtomScript.dll";
 
         [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
         private extern static void GetErrorMessage(int id, StringBuilder sb);
-        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
-        private extern static int Initialize(
-            LoadfileCallBack loadfile,
-            FunctionCallBack funcall);
-
         [DllImport(DLL_NAME)]
         private extern static int NewInterpreter(ref int id);
+
+        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
+        private extern static int Initialize(int id, LoadfileCallBack loadfile, FunctionCallBack funcall);
+
         [DllImport(DLL_NAME)]
         private extern static void Terminate(int id);
-        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
+        [DllImport(DLL_NAME)]
         private extern static int ResetState(int id);
+        [DllImport(DLL_NAME)]
+        private extern static int ResetMemory(int id);
+
         [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
-        private extern static int ExecuteCode(int id, string code);
-        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
+        private extern static int ExecuteProgram(int id, string file);
+        [DllImport(DLL_NAME)]
         private extern static int Next(int id);
 
-        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
-        private extern static int GetVarType(int id, string varname, ref int out_type);
-        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
-        private extern static int GetVarString(int id, string varname, StringBuilder out_str);
-        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
-        private extern static int GetVarNumber(int id, string varname, ref float out_num);
-        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
-        private extern static int GetVarUser(int id, string varname, ref int out_userid);
+        [DllImport(DLL_NAME)]
+        private extern static int GetVariable(int id, string varname, ref Variable out_var);
+        [DllImport(DLL_NAME)]
+        private extern static int SetVariable(int id, string varname, Variable var);
+        [DllImport(DLL_NAME)]
+        private extern static int DelVariable(int id, string varname);
+        [DllImport(DLL_NAME)]
+        private extern static int SetStringVariable(int id, string varname, string str);
+        [DllImport(DLL_NAME)]
+        private extern static int NewString(int id, string str, ref int out_ptr);
+        [DllImport(DLL_NAME)]
+        private extern static int GetString(int id, int str_ptr, StringBuilder out_str);
+        [DllImport(DLL_NAME)]
+        private extern static int GetStringLength(int id, int str_ptr, ref int out_length);
 
-        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
-        private extern static int SetVarString(int id, string varname, string value);
-        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
-        private extern static int SetVarNum(int id, string varname, float num);
-        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
-        private extern static int SetVarUser(int id, string varname, int userid);
+        [DllImport(DLL_NAME)]
+        private extern static int GetProgramName(int id, StringBuilder out_name);
 
+        [DllImport(DLL_NAME)]
+        private extern static int SerializeState(int id, ref int out_length);
         [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
-        private extern static int DelVar(int id, string varname);
+        private extern static int TakeSerializationData(int id, byte[] buf);
+        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
+        private extern static int DeserializeState(int id, byte[] deser_buf, int buf_size);
 
-        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
-        private extern static int SerializeState(int id, StringBuilder ser_str);
-        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
-        private extern static int DeserializeState(int id, string deser_str);
-        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
-        private extern static int GetStateStatus(int id, ref int exeptr, ref int var_counts);
-        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
-        private extern static int ReleaseSerializeStr(StringBuilder str);
         [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
         private extern static void GetLibVersion(StringBuilder str);
 
@@ -119,189 +137,35 @@ namespace JxCode.AtomLang
         public const int kRunBreak = 0;
         public const int kRunNext = 1;
 
-        public enum VariableType : int
-        {
-            Null,
-            Numeric,
-            String,
-            UserVarId
-        }
-        public struct Variable
-        {
-            public VariableType type;
-            public float num;
-            public string str;
-            public int user_type_ptr;
-        }
-
-
-
         private static Dictionary<int, Interpreter> interstates = new Dictionary<int, Interpreter>();
 
-        private static string OnLoadFile(int id, string path)
+        private static string _OnLoadFile(int id, string path)
         {
             return interstates[id].OnLoadFile(path);
         }
-        private static int OnFuncall(int id, int userid, TokenGroup domain, TokenGroup path, TokenGroup param)
+        private static int _OnFuncall(int id, int userptr, TokenGroup domain, TokenGroup path, VariableGroup param)
         {
-            return interstates[id].OnFuncall(userid, domain, path, param);
+            return interstates[id].OnFuncall(userptr, domain, path, param);
         }
-
-
-
-        static Interpreter()
-        {
-            Initialize(OnLoadFile, OnFuncall);
-        }
-
 
         private int id;
         public int Id { get => this.id; }
         private Func<string, string> loadfile;
 
-        //private Dictionary<Type, Dictionary<string, MethodInfo>> typeTable = new Dictionary<Type, Dictionary<string, MethodInfo>>();
-        //public Interpreter AddType(Type type)
-        //{
-        //    if (this.typeTable.ContainsKey(type))
-        //    {
-        //        return this;
-        //    }
-        //    var methodTable = new Dictionary<string, MethodInfo>();
-        //    this.typeTable.Add(type, methodTable);
-        //    var methods = type.GetMethods();
-        //    foreach (var item in methods)
-        //    {
-        //        methodTable.Add(item.Name, item);
-        //        //方法别名
-        //        if (Attribute.IsDefined(item, typeof(NickAttribute)))
-        //        {
-        //            var nick = (NickAttribute)Attribute.GetCustomAttribute(item, typeof(NickAttribute));
-        //            methodTable.Add(nick.NickName, item);
-        //        }
-        //    }
-        //    return this;
-        //}
 
-        private Dictionary<int, object> insts = new Dictionary<int, object>();
-        private int instcount = 0;
-        private int GetNewLocalVarId()
+        private Dictionary<int, object> userInstance = new Dictionary<int, object>();
+        private int instanceAllocPtr = 0;
+
+        private int AllocNewUserPtr(object obj)
         {
-            return ++this.instcount;
-        }
-        private void SetLocalVar(int userid, object o)
-        {
-            if (this.insts.ContainsKey(userid))
-            {
-                this.insts[userid] = o;
-            }
-            else
-            {
-                this.insts.Add(userid, o);
-            }
-        }
-        private int AddLocalVar(object o)
-        {
-            ++this.instcount;
-            this.insts.Add(this.instcount, o);
-            return this.instcount;
-        }
-        private void DelLocalVar(int id)
-        {
-            if (this.insts.ContainsKey(id))
-            {
-                this.insts.Remove(id);
-            }
+            ++this.instanceAllocPtr;
+            this.userInstance.Add(this.instanceAllocPtr, obj);
+            return this.instanceAllocPtr;
         }
 
-        private object GetLocalVar(int id)
+        private void ThrowLastError()
         {
-            object o = null;
-            this.insts.TryGetValue(id, out o);
-            return o;
-        }
-        public Variable GetVar(string name)
-        {
-            int type = 0;
-            int r = GetVarType(this.id, name, ref type);
-            if (r != kSuccess)
-            {
-                throw new InterpreterException(GetErrorMessage());
-            }
-            Variable v = new Variable();
-            v.type = (VariableType)type;
-            switch (v.type)
-            {
-                case VariableType.Null:
-                    break;
-                case VariableType.Numeric:
-                    GetVarNumber(this.id, name, ref v.num);
-                    break;
-                case VariableType.String:
-                    StringBuilder sb = new StringBuilder(1024);
-                    GetVarString(this.id, name, sb);
-                    v.str = sb.ToString();
-                    break;
-                case VariableType.UserVarId:
-                    GetVarUser(this.id, name, ref v.user_type_ptr);
-                    break;
-                default:
-                    break;
-            }
-            return v;
-        }
-        private void DelUserVar(string name)
-        {
-            int type = 0;
-            int r = GetVarType(this.id, name, ref type);
-            if (r == kSuccess)
-            {
-                if (type == (int)VariableType.UserVarId)
-                {
-                    int cuser_id = 0;
-                    GetVarUser(this.id, name, ref cuser_id);
-                    this.DelLocalVar(cuser_id);
-                }
-            }
-        }
-        public void SetVar(string name, float num)
-        {
-            DelUserVar(name);
-            SetVarNum(this.id, name, num);
-        }
-        public void SetVar(string name, string str)
-        {
-            DelUserVar(name);
-            SetVarString(this.id, name, str);
-        }
-        public void SetVar(string name, object obj)
-        {
-            int type = 0;
-            int r = GetVarType(this.id, name, ref type);
-            if (r == kNullResult)
-            {
-                //为空则新建
-                int userid = this.AddLocalVar(obj);
-                SetVarUser(this.id, name, userid);
-            }
-            else
-            {
-                //有该名字的变量，进行类型判断
-                if (type == (int)VariableType.UserVarId)
-                {
-                    //如果是userid获取
-                    int cuser_id = 0;
-                    GetVarUser(this.id, name, ref cuser_id);
-                    this.SetLocalVar(cuser_id, obj);
-                    SetVarUser(this.id, name, cuser_id);
-                }
-                else
-                {
-                    //其他类型同名变量，获取一个变量id
-                    int cu_id = this.GetNewLocalVarId();
-                    this.SetLocalVar(cu_id, obj);
-                    SetVarUser(this.id, name, cu_id);
-                }
-            }
+            throw new InterpreterException(this.GetErrorMessage());
         }
 
         public Interpreter(Func<string, string> loadfile)
@@ -313,6 +177,23 @@ namespace JxCode.AtomLang
             this.id = _id;
 
             interstates.Add(_id, this);
+            Initialize(_id, _OnLoadFile, _OnFuncall);
+        }
+        public Interpreter ExecuteProgram(string file)
+        {
+            if (ExecuteProgram(this.id, file) != kSuccess)
+            {
+                throw new InterpreterException(this.GetErrorMessage());
+            }
+            return this;
+        }
+        public Interpreter Next()
+        {
+            if (Next(this.id) != kSuccess)
+            {
+                throw new InterpreterException(GetErrorMessage());
+            }
+            return this;
         }
 
         private MethodInfo GetSerializeMethodInfo(object obj)
@@ -365,18 +246,86 @@ namespace JxCode.AtomLang
             }
         }
 
+        public Variable GetVariable(string name)
+        {
+            Variable variable = new Variable();
+            if (GetVariable(this.id, name, ref variable) != kSuccess)
+            {
+                throw new InterpreterException(this.GetErrorMessage());
+            }
+            return variable;
+        }
+        public void SetVariable(string name, Variable variable)
+        {
+            if (SetVariable(this.id, name, variable) != kSuccess)
+            {
+                throw new InterpreterException(this.GetErrorMessage());
+            }
+        }
+        public void DelVariable(string name)
+        {
+            if (DelVariable(this.id, name) != kSuccess)
+            {
+                throw new InterpreterException(this.GetErrorMessage());
+            }
+        }
+        public void SetStringVariable(string name, string str)
+        {
+            if (SetStringVariable(this.id, name, str) != kSuccess)
+            {
+                throw new InterpreterException(this.GetErrorMessage());
+            }
+        }
+
+        private int NewString(string name)
+        {
+            int strptr = 0;
+            if (NewString(this.id, name, ref strptr) != kSuccess)
+            {
+                ThrowLastError();
+            }
+            return strptr;
+        }
+        private string GetString(int strptr)
+        {
+            int length = 0;
+            if (GetStringLength(this.id, strptr, ref length) != kSuccess)
+                this.ThrowLastError();
+            StringBuilder buf = new StringBuilder(length);
+            if (GetString(this.id, strptr, buf) != kSuccess)
+                this.ThrowLastError();
+            return buf.ToString();
+        }
+
+        public string GetProgramName()
+        {
+            StringBuilder sb = new StringBuilder(256);
+            if (GetProgramName(this.id, sb) != kSuccess)
+            {
+                this.ThrowLastError();
+            }
+            return sb.ToString();
+        }
+
         public void Serialize(Stream stream)
         {
-            StringBuilder sb = new StringBuilder(1024);
-            SerializeState(this.id, sb);
-            string c_ser_str = sb.ToString();
+            int native_length = 0;
+            if (SerializeState(this.id, ref native_length) != kSuccess)
+            {
+                this.ThrowLastError();
+            }
+            byte[] native_buf = new byte[native_length];
+            if (TakeSerializationData(this.id, native_buf) != kSuccess)
+            {
+                this.ThrowLastError();
+            }
 
             BinaryWriter bw = new BinaryWriter(stream);
 
-            bw.Write(c_ser_str);
-            bw.Write(this.insts.Count);
-            foreach (var item in this.insts)
+            bw.Write(this.userInstance.Count);
+            foreach (var item in this.userInstance)
             {
+                //id 类型全名 序列化数据
                 bw.Write(item.Key);
                 bw.Write(item.Value.GetType().FullName);
                 MethodInfo mi = GetSerializeMethodInfo(item.Value);
@@ -388,6 +337,7 @@ namespace JxCode.AtomLang
                 }
                 else
                 {
+                    //流对象隔离
                     MemoryStream ms = new MemoryStream();
                     mi.Invoke(item.Value, new object[] { ms });
                     var buf = ms.ToArray();
@@ -396,37 +346,121 @@ namespace JxCode.AtomLang
                     ms.Close();
                 }
             }
+
+            //写解释器数据
+            bw.Write(native_buf.Length);
+            bw.Write(native_buf);
+
             bw.Flush();
         }
         public void Deserialize(Stream stream)
         {
             BinaryReader br = new BinaryReader(stream);
-            DeserializeState(this.id, br.ReadString());
 
             int varCount = br.ReadInt32();
             for (int i = 0; i < varCount; i++)
             {
                 //name, Type, value
                 int user_id = br.ReadInt32();
-                int buf_length = br.ReadInt32();
+                string typeFullName = br.ReadString();
 
+                int bufLength = br.ReadInt32();
+
+                //流数据隔离
                 MemoryStream ms = new MemoryStream();
-                if (buf_length != 0)
+                if (bufLength != 0)
                 {
-                    ms.Write(br.ReadBytes(buf_length), 0, buf_length);
+                    ms.Write(br.ReadBytes(bufLength), 0, bufLength);
                     ms.Position = 0;
                 }
 
-                MethodInfo mi = GetDeserializeMethodInfo(br.ReadString());
-                object v = mi.Invoke(null, new object[] { ms });
+                Type t = Type.GetType(typeFullName);
+                object instance = Activator.CreateInstance(t);
+
+                MethodInfo mi = GetDeserializeMethodInfo(typeFullName);
+                object v = mi.Invoke(instance, new object[] { ms });
                 ms.Close();
-                this.insts.Add(user_id, v);
+                this.userInstance.Add(user_id, v);
+            }
+
+            //native data
+            int nativeLength = br.ReadInt32();
+            byte[] nativeBuf = br.ReadBytes(nativeLength);
+            if(DeserializeState(this.id, nativeBuf, nativeLength) != kSuccess)
+            {
+                this.ThrowLastError();
             }
         }
+
+        private object GetLocalUserInstance(int userptr)
+        {
+            object value = null;
+            this.userInstance.TryGetValue(userptr, out value);
+            return value;
+        }
+        public void SetNumberVariable(string name, float num)
+        {
+            Variable v = new Variable();
+            v.type = VariableType.Number;
+            v.num = num;
+            this.SetVariable(name, v);
+        }
+        public void SetUserVariable(string name, object obj)
+        {
+            int ptr = this.AllocNewUserPtr(obj);
+            Variable v = new Variable();
+            v.type = VariableType.Userptr;
+            v.ptr = ptr;
+            this.SetVariable(name, v);
+        }
+
+        public object VariableToAny(Variable variable)
+        {
+            switch (variable.type)
+            {
+                case VariableType.Undefined:
+                    return null;
+                case VariableType.Null:
+                    return null;
+                case VariableType.Number:
+                    return variable.num;
+                case VariableType.Strptr:
+                    return this.GetString(variable.ptr);
+                case VariableType.Userptr:
+                    return this.GetLocalUserInstance(variable.ptr);
+                default:
+                    return null;
+            }
+        }
+        public object GetAnyVariable(string name)
+        {
+            var _var = this.GetVariable(name);
+            return this.VariableToAny(_var);
+        }
+
+        public void SetAnyVariable(string name, object obj)
+        {
+            Variable variable = new Variable();
+            Type retType = obj.GetType();
+            if(retType == typeof(string))
+            {
+                this.SetStringVariable(name, (string)obj);
+            }
+            else if (retType.IsPrimitive)
+            {
+                this.SetNumberVariable(name, Convert.ToSingle(obj));
+            }
+            else
+            {
+                this.SetUserVariable(name, obj);
+            }
+        }
+
         private string GetExceptionInfo(TokenInfo info, string content)
         {
+            string value = new string(info.value);
             return string.Format("{0}, value: {1}, line: {2}, pos: {3}",
-                content, info.value, info.line, info.position);
+                content, value, info.line, info.position);
         }
 
         private string OnLoadFile(string path)
@@ -434,33 +468,33 @@ namespace JxCode.AtomLang
             return this.loadfile(path);
         }
 
-        private int OnFuncall(int userid, TokenGroup domain, TokenGroup path, TokenGroup param)
+        private int OnFuncall(int userid, TokenGroup domain, TokenGroup path, VariableGroup param)
         {
             string[] domains = new string[domain.size];
             for (int i = 0; i < domains.Length; i++)
             {
-                domains[i] = (domain.tokens[i].value);
+                domains[i] = new string(domain.tokens[i].value);
             }
 
             string[] paths = new string[path.size - 1];
             for (int i = 0; i < paths.Length; i++)
             {
-                paths[i] = (path.tokens[i].value);
+                paths[i] = new string(path.tokens[i].value);
             }
 
             //获取最后一个方法名
             TokenInfo methodNameToken = path.tokens[path.size - 1];
-            string method = (path.tokens[path.size - 1].value);
+            string method = new string(path.tokens[path.size - 1].value);
 
-            string[] paramstrs = new string[param.size];
+            object[] paramstrs = new object[param.size];
             for (int i = 0; i < paramstrs.Length; i++)
             {
-                paramstrs[i] = (param.tokens[i].value);
+                paramstrs[i] = this.VariableToAny(param.vars[i]);
             }
 
             Type type = null;
             MethodInfo methodInfo = null;
-            object inst = this.GetLocalVar(userid);
+            object inst = this.userInstance[userid];
 
 
             if (userid != 0)
@@ -489,32 +523,6 @@ namespace JxCode.AtomLang
                         throw new InterpreterException(GetExceptionInfo(path.tokens[i], "未找到对象"));
                     }
                     type = inst.GetType();
-                }
-            }
-            //如果没有按方法名找到那就用别名找
-            methodInfo = type.GetMethod(method);
-
-            if (methodInfo == null)
-            {
-                //找别名
-                var methodinfos = type.GetMethods();
-                foreach (var item in methodinfos)
-                {
-                    if (Attribute.IsDefined(item, typeof(NickAttribute)))
-                    {
-                        NickAttribute nick = (NickAttribute)Attribute.GetCustomAttribute(item, typeof(NickAttribute));
-                        if (nick.NickName == method)
-                        {
-                            //别名和方法名匹配
-                            methodInfo = item;
-                            break;
-                        }
-                    }
-                }
-                if (methodInfo == null)
-                {
-                    //别名查找还是为空则抛出异常
-                    throw new InterpreterException(GetExceptionInfo(methodNameToken, "未找到方法"));
                 }
             }
 
@@ -551,19 +559,7 @@ namespace JxCode.AtomLang
             object rst = methodInfo.Invoke(inst, _params);
             if (rst != null)
             {
-                Type retType = rst.GetType();
-                if (retType == typeof(string))
-                {
-                    this.SetVar(__return, (string)rst);
-                }
-                else if (retType.IsPrimitive)
-                {
-                    this.SetVar(__return, Convert.ToSingle(rst));
-                }
-                else
-                {
-                    this.SetVar(__return, rst);
-                }
+                this.SetAnyVariable(__return, rst);
             }
             if (isSpecialMethod && (bool)_params[1] == false)
             {
@@ -605,41 +601,23 @@ namespace JxCode.AtomLang
             GetErrorMessage(this.id, sb);
             return sb.ToString();
         }
-        public Interpreter ExecuteCode(string code)
-        {
-            if (ExecuteCode(this.id, code) != 0)
-            {
-                throw new InterpreterException(GetErrorMessage());
-            }
-            return this;
-        }
-        public Interpreter Next()
-        {
-            if (Next(this.id) != 0)
-            {
-                throw new InterpreterException(GetErrorMessage());
-            }
 
-            return this;
-        }
-        public int GetVariableCount()
-        {
-            int exeptr = 0;
-            int var_count = 0;
-            GetStateStatus(this.id, ref exeptr, ref var_count);
-            return var_count;
-        }
-        private bool disaposed = false;
+
+        private bool disposed = false;
         public void Dispose()
         {
-            if (disaposed)
+            if (disposed)
             {
                 return;
             }
-            disaposed = true;
+            disposed = true;
             Terminate(this.id);
             interstates.Remove(this.id);
             GC.SuppressFinalize(this);
+        }
+        ~Interpreter()
+        {
+            this.Dispose();
         }
     }
 }
