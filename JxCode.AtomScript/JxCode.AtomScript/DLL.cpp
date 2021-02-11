@@ -1,11 +1,11 @@
 #include <vector>
 #include <string>
 #include <map>
-
+#include <stdint.h>
 #include <malloc.h>
 
 #include "DLL.h"
-
+#include "Interpreter.h"
 
 #ifdef _WIN32 //DLL_MAIN
 #include <Windows.h>
@@ -174,7 +174,17 @@ int CALLAPI ResetState(int id)
     if (state == nullptr) {
         return kNullResult;
     }
-    state->interpreter->Reset();
+    state->interpreter->ResetState();
+    return kSuccess;
+}
+
+int CALLAPI ResetMemory(int id)
+{
+    auto inter = CheckAndGetState(id);
+    if (inter == nullptr) {
+        return kNullResult;
+    }
+    inter->interpreter->ResetMemory();
     return kSuccess;
 }
 
@@ -189,24 +199,7 @@ void CALLAPI Terminate(int id)
     DelState(id);
 }
 
-int CALLAPI ExecuteCode(int id, const wchar_t* code)
-{
-    auto inter = CheckAndGetState(id);
-
-    if (inter == nullptr) {
-        return kNullResult;
-    }
-    try {
-        inter->interpreter->ExecuteCode(code);
-    }
-    catch (atomscript::InterpreterException& e) {
-        SetErrorMessage(id, e.what().c_str());
-        return kErrorMsg;
-    }
-    return kSuccess;
-}
-
-int CALLAPI ExecuteFile(int id, const wchar_t* file)
+int CALLAPI ExecuteProgram(int id, const wchar_t* file)
 {
     auto inter = CheckAndGetState(id);
     if (inter == nullptr) {
@@ -381,7 +374,7 @@ int CALLAPI TakeSerializationData(int id, char* ser_buf)
             SetErrorMessage(id, L"serialize data is empty");
             return kErrorMsg;
         }
-        strcpy(ser_buf, inter->serialize_data.c_str());
+        memcpy(ser_buf, inter->serialize_data.c_str(), inter->serialize_data.size());
         inter->serialize_data.clear();
     }
     catch (atomscript::InterpreterException& e) {
@@ -391,14 +384,14 @@ int CALLAPI TakeSerializationData(int id, char* ser_buf)
     return kSuccess;
 }
 
-int CALLAPI DeserializeState(int id, char* deser_buf)
+int CALLAPI DeserializeState(int id, char* deser_buf, int buf_size)
 {
     auto inter = CheckAndGetState(id);
     if (inter == nullptr) {
         return kNullResult;
     }
     try {
-        inter->interpreter->Deserialize(deser_buf);
+        inter->interpreter->Deserialize(string(deser_buf, buf_size));
     }
     catch (atomscript::InterpreterException& e) {
         SetErrorMessage(id, e.what().c_str());

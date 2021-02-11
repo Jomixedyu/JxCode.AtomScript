@@ -38,17 +38,24 @@ int main() {
     Initialize(
         id,
         [](int id, const wchar_t* path)->wchar_t* {
-            wstring dir(L"C:\\Users\\Jayshonyves\\Desktop\\" + wstring(path));
+            wstring dir(L"C:\\Users\\Jayshonyves\\Desktop\\" + wstring(path) + L".txt");
             wstring* str = new wstring(readAllText(dir));
             wcout << dir << endl;
             return const_cast<wchar_t*>(str->c_str());
         },
         [](int id, intptr_t user_type_id, TokenGroup domain, TokenGroup path, VariableGroup params)->int {
             wcout << user_type_id << endl;
-            return true;
+            return false;
         });
 
-    ExecuteCode(id, L"jumpfile \"def.txt\"");
+    ExecuteProgram(id, L"eazytest");
     Next(id);
 
+    int length = 0;
+    SerializeState(id, &length);
+    char* buf = new char[length];
+    TakeSerializationData(id, buf);
+
+    DeserializeState(id, buf, length);
+    int d = 1;
 }

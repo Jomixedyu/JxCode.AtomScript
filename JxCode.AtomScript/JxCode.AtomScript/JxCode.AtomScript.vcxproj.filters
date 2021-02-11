@@ -33,6 +33,9 @@
     <ClCompile Include="DLL.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="Variable.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Token.h">
@@ -48,6 +51,9 @@
       <Filter>头文件</Filter>
     </ClInclude>
     <ClInclude Include="DLL.h">
+      <Filter>头文件</Filter>
+    </ClInclude>
+    <ClInclude Include="Variable.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

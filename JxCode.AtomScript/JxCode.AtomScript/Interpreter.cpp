@@ -4,6 +4,7 @@
 #include <regex>
 #include <codecvt>
 #include <sstream>
+#pragma warning(disable:4996)
 
 namespace jxcode::atomscript
 {
@@ -40,7 +41,7 @@ namespace jxcode::atomscript
         return &this->variables_;
     }
     Interpreter::Interpreter(LoadFileCallBack _loadfile_, FuncallCallBack _funcall_)
-        : exec_ptr_(-1), _loadfile_(_loadfile_), _funcall_(_funcall_)
+        : ptr_alloc_index_(0), exec_ptr_(-1), _loadfile_(_loadfile_), _funcall_(_funcall_)
     {
     }
 
@@ -120,16 +121,15 @@ namespace jxcode::atomscript
 
     int Interpreter::NewStrPtr(const wstring& str)
     {
-        static int id = 0;
-
         int _id = this->GetStrPtr(str);
         if (_id != 0) {
             return _id;
         }
 
-        ++id;
-        this->strpool_[id] = str;
-        return 0;
+        ++this->ptr_alloc_index_;
+
+        this->strpool_[this->ptr_alloc_index_] = str;
+        return this->ptr_alloc_index_;
     }
 
     wstring* Interpreter::GetString(const int& strptr)
@@ -144,7 +144,7 @@ namespace jxcode::atomscript
             bool has_var = false;
             for (auto& var_item : this->variables_) {
                 const Variable& var = var_item.second;
-                if (var.type == VARIABLETYPE_STRPTR && var.str_ptr == item.first) {
+                if (var.type == VARIABLETYPE_STRPTR && var.ptr == item.first) {
                     has_var = true;
                     break;
                 }
@@ -221,10 +221,10 @@ namespace jxcode::atomscript
     }
 
 
-    void Interpreter::ResetCodeState()
+    void Interpreter::ResetState()
     {
         //清除 命令集，命令集执行指针，标签集
-        vector<OpCommand>().swap(this->commands_);
+        decltype(this->commands_)().swap(this->commands_);
         this->exec_ptr_ = -1;
         decltype(this->labels_)().swap(this->labels_);
         this->program_name_.clear();
@@ -232,6 +232,9 @@ namespace jxcode::atomscript
 
     bool Interpreter::ExecuteLine(const OpCommand& cmd)
     {
+        if (cmd.code == OpCode::Unknow) {
+            throw InterpreterException(cmd.op_token, L"unknow opcode");
+        }
         if (cmd.code == OpCode::Label) {
             //ignore;
         }
@@ -243,7 +246,7 @@ namespace jxcode::atomscript
                 CheckValidStrVarOrStrLiteral(this, cmd.targets[1]);
 
                 Variable var = this->GetVar(*cmd.targets[1].value);
-                label = this->GetString(var.str_ptr);
+                label = this->GetString(var.ptr);
             }
             else if (cmd.targets.size() == 1) {
                 //goto label
@@ -297,14 +300,12 @@ namespace jxcode::atomscript
 
             if (token.token_type == TokenType::Ident) {
                 auto var = this->GetVar(*token.value);
-                pfilestr = this->GetString(var.str_ptr);
+                pfilestr = this->GetString(var.ptr);
             }
             else {
                 pfilestr = token.value.get();
             }
-
-            wstring code = this->_loadfile_(*pfilestr);
-            this->ExecuteCode(code);
+            this->ExecuteProgram(*pfilestr);
         }
         else if (cmd.code == OpCode::If) {
             //暂时不做表达式，目前只可用==号判断
@@ -344,7 +345,7 @@ namespace jxcode::atomscript
             //instance
             if (var.type != VARIABLETYPE_UNDEFINED) {
                 CheckValidVariableType(cmd.targets[0], var, VARIABLETYPE_USERPTR);
-                var_userptr = var.user_ptr;
+                var_userptr = var.ptr;
                 index = 1;
             }
 
@@ -462,9 +463,13 @@ namespace jxcode::atomscript
 
         return mp;
     }
-    Interpreter* Interpreter::ExecuteCode(const wstring& code)
+
+    Interpreter* Interpreter::ExecuteProgram(const wstring& program_name_)
     {
-        this->ResetCodeState();
+        this->ResetState();
+
+        this->program_name_ = program_name_;
+        wstring code = this->_loadfile_(program_name_);
 
         auto tokens = lexer::Scanner(&const_cast<wstring&>(code),
             &get_atom_operator_map(),
@@ -480,15 +485,6 @@ namespace jxcode::atomscript
                 this->labels_[token_value] = i;
             }
         }
-
-        return this;
-    }
-
-    Interpreter* Interpreter::ExecuteProgram(const wstring& program_name_)
-    {
-        this->program_name_ = program_name_;
-        wstring code = this->_loadfile_(program_name_);
-        this->ExecuteCode(code);
         return this;
     }
 
@@ -496,7 +492,7 @@ namespace jxcode::atomscript
     {
         //check
         if (this->exec_ptr_ + 1 >= (int32_t)this->opcmd_count()) {
-            this->ResetCodeState();
+            this->ResetState();
             return false;
         }
 
@@ -512,7 +508,7 @@ namespace jxcode::atomscript
             }
             //check range
             if (this->exec_ptr_ >= (int32_t)this->opcmd_count()) {
-                this->ResetCodeState();
+                this->ResetState();
                 return false;
             }
             else {
@@ -524,9 +520,9 @@ namespace jxcode::atomscript
         return true;
     }
 
-    void Interpreter::Reset()
+    void Interpreter::ResetMemory()
     {
-        this->ResetCodeState();
+        this->ptr_alloc_index_ = 0;
         decltype(this->variables_)().swap(this->variables_);
         decltype(this->strpool_)().swap(this->strpool_);
     }
@@ -542,6 +538,35 @@ namespace jxcode::atomscript
         int32_t i = *(int32_t*)&bytes;
         return i;
     }
+    inline static void StreamWriteString(ostream* stream, const string& str)
+    {
+        int32_t size = str.size();
+        StreamWriteInt32(stream, size + 1);
+        stream->write(str.c_str(), size);
+        stream->write("\0", 1);
+    }
+    inline static string StreamReadString(istream* stream)
+    {
+        int32_t size = StreamReadInt32(stream);
+        char* buf = new char[size];
+        stream->read(buf, size);
+        string str(buf);
+        delete[] buf;
+        return str;
+    }
+    inline static void StreamWriteVariable(ostream* stream, Variable& var)
+    {
+        char var_ser[sizeof(Variable)];
+        SerializeVariable(&var, var_ser);
+        stream->write(var_ser, sizeof(Variable));
+    }
+    inline static Variable StreamReadVariable(istream* stream)
+    {
+        char var_ser[sizeof(Variable)];
+        stream->read(var_ser, sizeof(Variable));
+        Variable var = DeserializeVariable(var_ser);
+        return var;
+    }
 
     string Interpreter::Serialize()
     {
@@ -550,37 +575,28 @@ namespace jxcode::atomscript
         std::wstring_convert<std::codecvt_utf8<wchar_t>> c;
         stringstream ss;
 
+        //state
+        
+        StreamWriteString(&ss, c.to_bytes(this->program_name_));
+        StreamWriteInt32(&ss, this->exec_ptr_);
+        StreamWriteInt32(&ss, this->ptr_alloc_index_);
+
         //variables
-
         StreamWriteInt32(&ss, (int32_t)this->variables_.size());
-
         for (auto& item : this->variables_) {
 
-            auto name = c.to_bytes(item.first);
-            int32_t _length = (int32_t)name.size();
-
-            ss.write((char*)&_length, sizeof(int32_t));
-
-            ss.write(name.c_str(), _length);
-
-            char varser[sizeof(Variable)];
-            SerializeVariable(&item.second, varser);
-
-            ss.write(varser, sizeof(Variable));
+            string name = c.to_bytes(item.first);
+            StreamWriteString(&ss, name);
+            StreamWriteVariable(&ss, item.second);
         }
         //strpool
-
         StreamWriteInt32(&ss, (int32_t)this->strpool_.size());
-
         for (auto& item : this->strpool_) {
 
             StreamWriteInt32(&ss, item.first);
 
             string encode_str = c.to_bytes(item.second);
-            int32_t str_len = (int32_t)encode_str.size();
-            StreamWriteInt32(&ss, str_len);
-
-            ss.write(encode_str.c_str(), str_len);
+            StreamWriteString(&ss, encode_str);
         }
 
         return ss.str();
@@ -589,88 +605,39 @@ namespace jxcode::atomscript
 
     void Interpreter::Deserialize(const string& data)
     {
+        this->ResetMemory();
+
         stringstream ss(data);
         std::wstring_convert<std::codecvt_utf8<wchar_t>> c;
-        
+
+        wstring program_name = c.from_bytes(StreamReadString(&ss));
+        this->ExecuteProgram(program_name);
+        this->exec_ptr_ = StreamReadInt32(&ss);
+        this->ptr_alloc_index_ = StreamReadInt32(&ss);
+
         //variables
         int32_t _length = StreamReadInt32(&ss);
 
         for (int32_t i = 0; i < _length; i++)
         {
-            int32_t var_name_len = StreamReadInt32(&ss);
-
-            //变量名长度不能超过64个字符
-            char name_buf[64] = { 0 };
-            ss.read(name_buf, var_name_len);
-            wstring name = c.from_bytes(name_buf);
-            
-            char var_buf[sizeof(Variable)];
-            ss.read(var_buf, sizeof(Variable));
-            Variable var = DeserializeVariable(var_buf);
-
+            wstring name = c.from_bytes(StreamReadString(&ss));
+            Variable var = StreamReadVariable(&ss);
             this->SetVar(name, var);
         }
 
         //strpool
         
         int32_t strpool_len = StreamReadInt32(&ss);
-
         for (int32_t i = 0; i < strpool_len; i++)
         {
             int32_t str_ptr = StreamReadInt32(&ss);
-
-            int32_t str_len = StreamReadInt32(&ss);
-            char* str_buf = new char[str_len];
-            ss.read(str_buf, str_len);
-            wstring str = c.from_bytes(str_buf);
-            delete[] str_buf;
-
+            wstring str = c.from_bytes(StreamReadString(&ss));
             this->strpool_[str_ptr] = str;
         }
     }
 
-
 #pragma endregion
 
-#pragma region Variable
-    void SetVariableUndefined(Variable* var)
-    {
-        var->type = VARIABLETYPE_UNDEFINED;
-    }
-    void SetVariableNull(Variable* var)
-    {
-        var->type = VARIABLETYPE_NULL;
-        var->num = 0;
-    }
-
-    void SetVariableNumber(Variable* var, float num)
-    {
-        var->type = VARIABLETYPE_NUMBER;
-        var->num = num;
-    }
-
-    void SetVariableStrPtr(Variable* var, int ptr)
-    {
-        var->type = VARIABLETYPE_STRPTR;
-        var->str_ptr = ptr;
-    }
-
-    void SetVariableUserPtr(Variable* var, int user_ptr)
-    {
-        var->type = VARIABLETYPE_USERPTR;
-        var->user_ptr = user_ptr;
-    }
-    void SerializeVariable(Variable* var, char out[8])
-    {
-        memcpy(out, &var, sizeof(Variable));
-    }
-    Variable DeserializeVariable(char value[8])
-    {
-        Variable var;
-        memcpy(&var, value, 8);
-        return var;
-    }
-#pragma endregion
 
 }
 

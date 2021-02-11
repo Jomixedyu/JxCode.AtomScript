@@ -8,12 +8,7 @@
 
 #include "Token.h"
 #include "OpCommand.h"
-
-#define VARIABLETYPE_UNDEFINED -1
-#define VARIABLETYPE_NULL 0
-#define VARIABLETYPE_NUMBER 1
-#define VARIABLETYPE_STRPTR 2
-#define VARIABLETYPE_USERPTR 3
+#include "Variable.h"
 
 namespace jxcode::atomscript
 {
@@ -24,24 +19,6 @@ namespace jxcode::atomscript
     using std::shared_ptr;
     using std::function;
     using lexer::Token;
-
-    struct Variable
-    {
-        int32_t type;
-        union {
-            float num;
-            int32_t str_ptr;
-            int32_t user_ptr;
-        };
-    };
-    void SetVariableUndefined(Variable* var);
-    void SetVariableNull(Variable* var);
-    void SetVariableNumber(Variable* var, float num);
-    void SetVariableStrPtr(Variable* var, int ptr);
-    void SetVariableUserPtr(Variable* var, int user_ptr);
-
-    void SerializeVariable(Variable* var, char out[8]);
-    Variable DeserializeVariable(char value[8]);
 
     class InterpreterException
     {
@@ -70,14 +47,15 @@ namespace jxcode::atomscript
         LoadFileCallBack _loadfile_;
         FuncallCallBack _funcall_;
 
-        wstring program_name_;
+        wstring program_name_; //ser
 
         vector<OpCommand> commands_;
-        int32_t exec_ptr_;
+        int32_t exec_ptr_; //ser
         map<wstring, size_t> labels_;
 
-        map<wstring, Variable> variables_;
-        map<int32_t, wstring> strpool_;
+        map<wstring, Variable> variables_; //ser
+        map<int32_t, wstring> strpool_; //ser
+        int32_t ptr_alloc_index_; //ser
     public:
         int32_t line_num() const;
         size_t opcmd_count() const;
@@ -88,7 +66,6 @@ namespace jxcode::atomscript
             LoadFileCallBack _loadfile_,
             FuncallCallBack _funcall_);
     protected:
-        void ResetCodeState();
         bool ExecuteLine(const OpCommand& cmd);
     public:
         bool IsExistLabel(const wstring& label);
@@ -104,12 +81,12 @@ namespace jxcode::atomscript
         wstring* GetString(const int& strptr);
         void GCollect();
     public:
-        Interpreter* ExecuteCode(const wstring& code);
         Interpreter* ExecuteProgram(const wstring& program_name_);
         //返回是否运行结束
         bool Next();
-        
-        void Reset();
+
+        void ResetState();
+        void ResetMemory();
 
         string Serialize();
         void Deserialize(const string& data);

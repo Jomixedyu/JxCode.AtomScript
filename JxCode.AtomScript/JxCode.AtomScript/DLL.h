@@ -1,8 +1,7 @@
-#ifndef JXCODE_LANG_atomscript_DLL_H
-#define JXCODE_LANG_atomscript_DLL_H
+#ifndef JXCODE_ATOMSCRIPT_DLL_H
+#define JXCODE_ATOMSCRIPT_DLL_H
 
-#include <stdint.h>
-#include "Interpreter.h"
+#include "Variable.h"
 
 #define CALLAPI __stdcall
 
@@ -26,7 +25,7 @@ typedef struct
 
 typedef struct
 {
-    jxcode::atomscript::Variable vars[8];
+    Variable vars[8];
     int size;
 } VariableGroup;
 
@@ -42,14 +41,14 @@ extern "C" {
     DLLEXPORT int CALLAPI SetCode(int id, wchar_t* str);
     DLLEXPORT void CALLAPI Terminate(int id);
     DLLEXPORT int CALLAPI ResetState(int id);
-    DLLEXPORT int CALLAPI ExecuteCode(int id, const wchar_t* code);
-    DLLEXPORT int CALLAPI ExecuteFile(int id, const wchar_t* file);
+    DLLEXPORT int CALLAPI ResetMemory(int id);
+    DLLEXPORT int CALLAPI ExecuteProgram(int id, const wchar_t* file);
     DLLEXPORT int CALLAPI Next(int id);
 
     DLLEXPORT int CALLAPI GetProgramName(int id, wchar_t* out_name);
 
-    DLLEXPORT int CALLAPI GetVariable(int id, wchar_t* varname, jxcode::atomscript::Variable* out_var);
-    DLLEXPORT int CALLAPI SetVariable(int id, wchar_t* varname, jxcode::atomscript::Variable var);
+    DLLEXPORT int CALLAPI GetVariable(int id, wchar_t* varname, Variable* out_var);
+    DLLEXPORT int CALLAPI SetVariable(int id, wchar_t* varname, Variable var);
     DLLEXPORT int CALLAPI SetStringVariable(int id, wchar_t* varname, wchar_t* str);
     DLLEXPORT int CALLAPI SetString(int id, wchar_t* str, int* out_ptr);
     DLLEXPORT int CALLAPI GetString(int id, int str_ptr, wchar_t* out_str);
@@ -59,11 +58,11 @@ extern "C" {
     DLLEXPORT int CALLAPI SerializeState(int id, int* out_length);
     DLLEXPORT int CALLAPI TakeSerializationData(int id, char* ser_buf);
 
-    DLLEXPORT int CALLAPI DeserializeState(int id, char* deser_buf);
+    DLLEXPORT int CALLAPI DeserializeState(int id, char* deser_buf, int buf_size);
 
     DLLEXPORT void CALLAPI GetLibVersion(wchar_t* out);
 #ifdef __cplusplus
 }
 #endif
 
-#endif // !JXCODE_LANG_atomscript_DLL_H
+#endif // !JXCODE_ATOMSCRIPT_DLL_H

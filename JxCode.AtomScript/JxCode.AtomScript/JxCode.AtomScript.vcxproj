@@ -41,6 +41,7 @@
     <ClCompile Include="OpCommand.cpp" />
     <ClCompile Include="test.cpp" />
     <ClCompile Include="Token.cpp" />
+    <ClCompile Include="Variable.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DLL.h" />
@@ -48,6 +49,7 @@
     <ClInclude Include="Lexer.h" />
     <ClInclude Include="OpCommand.h" />
     <ClInclude Include="Token.h" />
+    <ClInclude Include="Variable.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="cpp.hint" />
@@ -183,7 +185,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <ModuleDefinitionFile>DLL.def</ModuleDefinitionFile>
+      <ModuleDefinitionFile>
+      </ModuleDefinitionFile>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='DLLDebug|Win32'">
