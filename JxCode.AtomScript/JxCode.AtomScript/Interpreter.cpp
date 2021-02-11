@@ -36,9 +36,13 @@ namespace jxcode::atomscript
     {
         return this->program_name_;
     }
-    map<wstring, Variable>* Interpreter::variables()
+    const map<wstring, Variable>& Interpreter::variables()
     {
-        return &this->variables_;
+        return this->variables_;
+    }
+    const map<int32_t, wstring>& Interpreter::strpool()
+    {
+        return this->strpool_;
     }
     Interpreter::Interpreter(LoadFileCallBack _loadfile_, FuncallCallBack _funcall_)
         : ptr_alloc_index_(0), exec_ptr_(-1), _loadfile_(_loadfile_), _funcall_(_funcall_)

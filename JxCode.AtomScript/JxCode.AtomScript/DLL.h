@@ -59,6 +59,8 @@ extern "C" {
     DLLEXPORT int CALLAPI TakeSerializationData(int id, char* ser_buf);
     DLLEXPORT int CALLAPI DeserializeState(int id, char* deser_buf, int buf_size);
 
+    DLLEXPORT int CALLAPI StatisticVariable(int id, int* number, int* strptr, int* userptr, int* strpool_count);
+
     DLLEXPORT void CALLAPI GetLibVersion(wchar_t* out);
 #ifdef __cplusplus
 }

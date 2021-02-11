@@ -18,43 +18,31 @@ public class role
     {
         return new role() { name = str };
     }
+
+    public void Serialize(Stream stream)
+    {
+        Console.WriteLine("Serialize");
+    }
+    public void Deserialize(Stream stream)
+    {
+        Console.WriteLine("Deserialize");
+    }
 }
 
 namespace JxCode.AtomScript_cs
 {
     class Program
     {
-        public static bool Print(string str)
+        public static void print(string name)
         {
-            Console.WriteLine(str);
-            return true;
-        }
-        public static string load(string path)
-        {
-            return System.IO.File.ReadAllText(@"C:\Users\Jayshonyves\Desktop\" + path);
+            Console.WriteLine("print: " + name);
         }
         static void Main(string[] args)
         {
             Console.ReadKey();
-            Interpreter inter = new Interpreter(load);
-
-            inter.ExecuteCode("jumpfile \"def.txt\"");
+            Interpreter inter = new Interpreter(f => File.ReadAllText(@"C:\Users\Jayshonyves\Desktop\" + f + ".txt"));
+            inter.ExecuteProgram("eazytest");
             inter.Next();
-            //MemoryStream ms = new MemoryStream();
-
-
-            //Console.WriteLine(inter.GetVariableCount());
-
-            //inter.Serialize(ms);
-
-            //Interpreter inter2 = new Interpreter(load);
-
-            //ms.Position = 0;
-
-            //inter2.Deserialize(ms);
-            //Console.WriteLine(inter2.GetVariableCount());
-
-            Console.WriteLine("end");
             Console.ReadKey();
         }
     }

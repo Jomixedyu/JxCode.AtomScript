@@ -28,9 +28,9 @@ namespace JxCode.AtomLang
     {
         [FieldOffset(0)]
         public VariableType type;
-        [FieldOffset(1)]
+        [FieldOffset(4)]
         public float num;
-        [FieldOffset(1)]
+        [FieldOffset(4)]
         public int ptr;
     }
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -100,22 +100,22 @@ namespace JxCode.AtomLang
         [DllImport(DLL_NAME)]
         private extern static int Next(int id);
 
-        [DllImport(DLL_NAME)]
+        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
         private extern static int GetVariable(int id, string varname, ref Variable out_var);
-        [DllImport(DLL_NAME)]
+        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
         private extern static int SetVariable(int id, string varname, Variable var);
-        [DllImport(DLL_NAME)]
+        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
         private extern static int DelVariable(int id, string varname);
-        [DllImport(DLL_NAME)]
+        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
         private extern static int SetStringVariable(int id, string varname, string str);
-        [DllImport(DLL_NAME)]
+        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
         private extern static int NewString(int id, string str, ref int out_ptr);
-        [DllImport(DLL_NAME)]
+        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
         private extern static int GetString(int id, int str_ptr, StringBuilder out_str);
         [DllImport(DLL_NAME)]
         private extern static int GetStringLength(int id, int str_ptr, ref int out_length);
 
-        [DllImport(DLL_NAME)]
+        [DllImport(DLL_NAME, CharSet = CharSet.Unicode)]
         private extern static int GetProgramName(int id, StringBuilder out_name);
 
         [DllImport(DLL_NAME)]
@@ -151,7 +151,6 @@ namespace JxCode.AtomLang
         private int id;
         public int Id { get => this.id; }
         private Func<string, string> loadfile;
-
 
         private Dictionary<int, object> userInstance = new Dictionary<int, object>();
         private int instanceAllocPtr = 0;
@@ -440,7 +439,6 @@ namespace JxCode.AtomLang
 
         public void SetAnyVariable(string name, object obj)
         {
-            Variable variable = new Variable();
             Type retType = obj.GetType();
             if(retType == typeof(string))
             {
@@ -494,7 +492,7 @@ namespace JxCode.AtomLang
 
             Type type = null;
             MethodInfo methodInfo = null;
-            object inst = this.userInstance[userid];
+            object inst = this.GetLocalUserInstance(userid);
 
 
             if (userid != 0)
@@ -525,6 +523,7 @@ namespace JxCode.AtomLang
                     type = inst.GetType();
                 }
             }
+            methodInfo = type.GetMethod(method);
 
             ParameterInfo[] paramTypes = methodInfo.GetParameters();
             object[] _params = new object[paramTypes.Length];

@@ -420,6 +420,44 @@ int CALLAPI DeserializeState(int id, char* deser_buf, int buf_size)
     return kSuccess;
 }
 
+int CALLAPI StatisticVariable(int id, int* number, int* strptr, int* userptr, int* strpool_count)
+{
+    auto inter = CheckAndGetState(id);
+    if (inter == nullptr) {
+        return kNullResult;
+    }
+    try {
+        auto vars = inter->interpreter->variables();
+
+        int _number = 0;
+        int _strptr = 0;
+        int _userptr = 0;
+
+        for (auto& item : vars) {
+            if (item.second.type == VARIABLETYPE_NUMBER) {
+                ++_number;
+            }
+            else if (item.second.type == VARIABLETYPE_STRPTR) {
+                ++_strptr;
+            }
+            else if (item.second.type == VARIABLETYPE_USERPTR) {
+                ++_userptr;
+            }
+        }
+
+        *number = _number;
+        *strptr= _strptr;
+        *userptr = _userptr;
+
+        *strpool_count = inter->interpreter->strpool().size();
+    }
+    catch (atomscript::InterpreterException& e) {
+        SetErrorMessage(id, e.what().c_str());
+        return kErrorMsg;
+    }
+    return kSuccess;
+}
+
 
 
 void CALLAPI GetLibVersion(wchar_t* out)

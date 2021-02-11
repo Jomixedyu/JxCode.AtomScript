@@ -60,7 +60,8 @@ namespace jxcode::atomscript
         int32_t line_num() const;
         size_t opcmd_count() const;
         const wstring& program_name() const;
-        map<wstring, Variable>* variables();
+        const map<wstring, Variable>& variables();
+        const map<int32_t, wstring>& strpool();
     public:
         Interpreter(
             LoadFileCallBack _loadfile_,
