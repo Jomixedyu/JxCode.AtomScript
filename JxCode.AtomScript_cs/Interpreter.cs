@@ -5,7 +5,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 
-namespace JxCode.AtomLang
+namespace JxCode.AtomScript
 {
     public class InterpreterException : Exception
     {
@@ -166,7 +166,10 @@ namespace JxCode.AtomLang
         {
             throw new InterpreterException(this.GetErrorMessage());
         }
-
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="loadfile">读取文件的回调函数</param>
         public Interpreter(Func<string, string> loadfile)
         {
             int _id = 0;
@@ -320,7 +323,7 @@ namespace JxCode.AtomLang
             }
 
             BinaryWriter bw = new BinaryWriter(stream);
-
+            bw.Write(this.instanceAllocPtr);
             bw.Write(this.userInstance.Count);
             foreach (var item in this.userInstance)
             {
@@ -354,8 +357,11 @@ namespace JxCode.AtomLang
         }
         public void Deserialize(Stream stream)
         {
+            this.userInstance.Clear();
+
             BinaryReader br = new BinaryReader(stream);
 
+            this.instanceAllocPtr = br.ReadInt32();
             int varCount = br.ReadInt32();
             for (int i = 0; i < varCount; i++)
             {
@@ -375,11 +381,11 @@ namespace JxCode.AtomLang
 
                 Type t = Type.GetType(typeFullName);
                 object instance = Activator.CreateInstance(t);
+                this.userInstance.Add(user_id, instance);
 
                 MethodInfo mi = GetDeserializeMethodInfo(typeFullName);
                 object v = mi.Invoke(instance, new object[] { ms });
                 ms.Close();
-                this.userInstance.Add(user_id, v);
             }
 
             //native data

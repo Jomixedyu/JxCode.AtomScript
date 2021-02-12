@@ -1,19 +1,22 @@
 ﻿using System;
 using System.IO;
-using JxCode.AtomLang;
+using JxCode.AtomScript;
 
 public class role
 {
     public string name;
 
-    public void print(string text)
+    public static void show(string text)
+    {
+        Console.WriteLine("show text: " + text);
+    }
+
+    public void print(Interpreter inter, ref bool isNext, string text)
     {
         Console.WriteLine(this.name + ":  " + text);
+        isNext = false;
     }
-    public void Invoke(string text)
-    {
-        print(text);
-    }
+
     public static role create(string str)
     {
         return new role() { name = str };
@@ -21,11 +24,13 @@ public class role
 
     public void Serialize(Stream stream)
     {
-        Console.WriteLine("Serialize");
+        BinaryWriter br = new BinaryWriter(stream);
+        br.Write(this.name);
     }
     public void Deserialize(Stream stream)
     {
         Console.WriteLine("Deserialize");
+        BinaryReader br = new BinaryReader(stream);
     }
 }
 
@@ -37,12 +42,21 @@ namespace JxCode.AtomScript_cs
         {
             Console.WriteLine("print: " + name);
         }
-        static void Main(string[] args)
+        static void RunInterpreter()
         {
-            Console.ReadKey();
             Interpreter inter = new Interpreter(f => File.ReadAllText(@"C:\Users\Jayshonyves\Desktop\" + f + ".txt"));
             inter.ExecuteProgram("eazytest");
             inter.Next();
+            var fs = File.OpenWrite("ser.dat");
+            inter.Serialize(fs);
+            fs.Flush();
+            fs.Close();
+
+        }
+        static void Main(string[] args)
+        {
+            RunInterpreter();
+
             Console.ReadKey();
         }
     }
