@@ -5,7 +5,7 @@
 #include <cinttypes>
 #include <memory>
 #include <functional>
-
+#include <stack>
 #include "Token.h"
 #include "OpCommand.h"
 #include "Variable.h"
@@ -46,6 +46,10 @@ namespace jxcode::atomscript
     protected:
         LoadFileCallBack _loadfile_;
         FuncallCallBack _funcall_;
+        bool OnFunCall(const int32_t& user_ptr,
+            const vector<Token>& domain,
+            const vector<Token>& path,
+            const vector<Variable>& params);
 
         wstring program_name_; //ser
 
@@ -81,6 +85,7 @@ namespace jxcode::atomscript
         int NewStrPtr(const wstring& str);
         wstring* GetString(const int& strptr);
         void GCollect();
+        void SetReturnVariable(const Variable& var);
     public:
         Interpreter* ExecuteProgram(const wstring& program_name_);
         //返回是否运行结束
@@ -91,7 +96,25 @@ namespace jxcode::atomscript
 
         string Serialize();
         void Deserialize(const string& data);
+    };    
+    
+    class math_lib {
+    public:
+        static float add(float x, float y);
+        static float sub(float x, float y);
+        static float mul(float x, float y);
+        static float div(float x, float y);
+        static float pow(float x, float y);
+        static float sqrt(float x);
+        static void Invoke(Interpreter* inter, const wstring& name, std::stack<Variable>* params);
     };
+    class strlib_lib {
+    public:
+        static wstring cat(const wstring& str1, const wstring& str2);
+        static int cmp(const wstring& str1, const wstring& str2);
+        static void Invoke(Interpreter* inter, const wstring& name, std::stack<Variable>* params);
+    };
+
 }
 
 

@@ -23,6 +23,44 @@ namespace jxcode::atomscript
 
 
 #pragma region Interpreter
+    //压栈为stdcall方式，从右参数开始压栈
+    bool Interpreter::OnFunCall(const int32_t& user_ptr, const vector<Token>& domain, const vector<Token>& path, const vector<Variable>& params)
+    {
+        static wstring mathStr = L"math";
+        static wstring strlibStr = L"strlib";
+
+        stack<Variable> vars;
+
+        if (domain.size() == 1 && *domain[0].value == mathStr) {
+            const wstring& p = *path[0].value;
+
+            for (int i = params.size() - 1; i >= 0; i--) {
+                vars.push(params[i]);
+            }
+
+            math_lib::Invoke(this, p, &vars);
+
+            if (!vars.empty()) {
+                this->SetReturnVariable(vars.top());
+            }
+        }
+        else if (domain.size() == 1 && *domain[0].value == strlibStr) {
+            const wstring& p = *path[0].value;
+
+            for (int i = params.size() - 1; i >= 0; i--) {
+                vars.push(params[i]);
+            }
+
+            strlib_lib::Invoke(this, p, &vars);
+
+            if (!vars.empty()) {
+                this->SetReturnVariable(vars.top());
+            }
+        }
+        else {
+            return this->_funcall_(user_ptr, domain, path, params);
+        }
+    }
 
     int32_t Interpreter::line_num() const
     {
@@ -162,6 +200,11 @@ namespace jxcode::atomscript
         }
     }
 
+    void Interpreter::SetReturnVariable(const Variable& var)
+    {
+        this->SetVar(L"__return", var);
+    }
+
     inline static bool IsLiteralToken(const Token& token) {
         return token.token_type == TokenType::Number || token.token_type == TokenType::String;
     }
@@ -233,6 +276,7 @@ namespace jxcode::atomscript
         decltype(this->labels_)().swap(this->labels_);
         this->program_name_.clear();
     }
+
 
     bool Interpreter::ExecuteLine(const OpCommand& cmd)
     {
@@ -429,7 +473,8 @@ namespace jxcode::atomscript
 
             }
 
-            return this->_funcall_(var_userptr, domain, path, params);
+            this->OnFunCall(var_userptr, domain, path, params);
+            //return this->_funcall_(var_userptr, domain, path, params);
         }
 
         return true;
@@ -580,7 +625,7 @@ namespace jxcode::atomscript
         stringstream ss;
 
         //state
-        
+
         StreamWriteString(&ss, c.to_bytes(this->program_name_));
         StreamWriteInt32(&ss, this->exec_ptr_);
         StreamWriteInt32(&ss, this->ptr_alloc_index_);
@@ -630,7 +675,7 @@ namespace jxcode::atomscript
         }
 
         //strpool
-        
+
         int32_t strpool_len = StreamReadInt32(&ss);
         for (int32_t i = 0; i < strpool_len; i++)
         {
@@ -642,6 +687,77 @@ namespace jxcode::atomscript
 
 #pragma endregion
 
+
+    float math_lib::add(float x, float y) { return x + y; }
+    float math_lib::sub(float x, float y) { return x - y; }
+    float math_lib::mul(float x, float y) { return x * y; }
+    float math_lib::div(float x, float y) { return x / y; }
+    float math_lib::pow(float x, float y) { return ::powf(x, y); }
+    float math_lib::sqrt(float x) { return ::sqrtf(x); }
+
+    void math_lib::Invoke(Interpreter* inter, const wstring& name, std::stack<Variable>* params)
+    {
+        Variable p[3];
+        for (int i = 0; i < 3; i++)
+        {
+            if (params->empty()) {
+                break;
+            }
+            p[i] = params->top();
+            params->pop();
+        }
+
+        if (name == L"add") {
+            params->push(GetVariableNumber(add(p[0].num, p[1].num)));
+        }
+        else if (name == L"sub") {
+            params->push(GetVariableNumber(sub(p[0].num, p[1].num)));
+        }
+        else if (name == L"mul") {
+            params->push(GetVariableNumber(mul(p[0].num, p[1].num)));
+        }
+        else if (name == L"div") {
+            params->push(GetVariableNumber(div(p[0].num, p[1].num)));
+        }
+        else if (name == L"pow") {
+            params->push(GetVariableNumber(pow(p[0].num, p[1].num)));
+        }
+        else if (name == L"sqrt") {
+            params->push(GetVariableNumber(sqrt(p[0].num)));
+        }
+    }
+
+    wstring strlib_lib::cat(const wstring& str1, const wstring& str2)
+    {
+        return str1 + str2;
+    }
+
+    int strlib_lib::cmp(const wstring& str1, const wstring& str2)
+    {
+        return str1 == str2;
+    }
+
+    void strlib_lib::Invoke(Interpreter* inter, const wstring& name, std::stack<Variable>* params)
+    {
+        Variable v[3];
+        for (int i = 0; i < 3; i++)
+        {
+            if (params->empty()) {
+                break;
+            }
+            v[i] = params->top();
+            params->pop();
+        }
+
+        if (name == L"cat") {
+            int id = inter->NewStrPtr(cat(*inter->GetString(v[0].ptr), *inter->GetString(v[1].ptr)));
+            params->push(GetVariableStrPtr(id));
+        }
+        else if (name == L"cmp") {
+            int b = cmp(*inter->GetString(v[0].ptr), *inter->GetString(v[1].ptr));
+            params->push(GetVariableNumber((float)b));
+        }
+    }
 
 }
 

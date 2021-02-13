@@ -52,6 +52,10 @@ namespace JxCode.AtomScript_cs
             fs.Flush();
             fs.Close();
 
+            var deser_fs = File.OpenRead("ser.dat");
+            inter.Deserialize(deser_fs);
+            deser_fs.Close();
+            inter.Next();
         }
         static void Main(string[] args)
         {

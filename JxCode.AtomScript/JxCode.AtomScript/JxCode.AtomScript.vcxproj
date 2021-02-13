@@ -49,6 +49,7 @@
     <ClInclude Include="Lexer.h" />
     <ClInclude Include="OpCommand.h" />
     <ClInclude Include="Token.h" />
+    <ClInclude Include="utf8str_ext.h" />
     <ClInclude Include="Variable.h" />
   </ItemGroup>
   <ItemGroup>

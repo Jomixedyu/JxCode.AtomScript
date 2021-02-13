@@ -30,6 +30,18 @@ void SetVariableUserPtr(Variable* var, int user_ptr)
     var->type = VARIABLETYPE_USERPTR;
     var->ptr = user_ptr;
 }
+Variable GetVariableNumber(float num)
+{
+    Variable v;
+    SetVariableNumber(&v, num);
+    return v;
+}
+Variable GetVariableStrPtr(int ptr)
+{
+    Variable var;
+    SetVariableStrPtr(&var, ptr);
+    return var;
+}
 void SerializeVariable(Variable* var, char out[8])
 {
     memcpy(out, var, sizeof(Variable));

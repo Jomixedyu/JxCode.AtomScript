@@ -23,6 +23,9 @@ void SetVariableNumber(Variable* var, float num);
 void SetVariableStrPtr(Variable* var, int ptr);
 void SetVariableUserPtr(Variable* var, int user_ptr);
 
+Variable GetVariableNumber(float num);
+Variable GetVariableStrPtr(int ptr);
+
 void SerializeVariable(Variable* var, char out[8]);
 Variable DeserializeVariable(char value[8]);
 
