@@ -101,20 +101,7 @@ public class role
 ## 支持更多的语言
 查看JxCode.AtomScript\JxCode.AtomScript目录中的DLL.h查看导出的函数
 
-## 数字库
-```
-@math.add: x, y
-@math.sub: x, y
-@math.mul: x, y
-@math.div: x, y
-@math.pow: x, y
-@math.sqrt: x, y
-```
 
-## 字符串库
-```
-@strlib.strcat: a, b
-```
 
 ## AtomScript基础语法
 语法演示：  
