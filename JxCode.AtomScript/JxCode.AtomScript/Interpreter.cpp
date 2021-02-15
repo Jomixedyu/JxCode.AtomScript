@@ -473,7 +473,7 @@ namespace jxcode::atomscript
 
             }
 
-            this->OnFunCall(var_userptr, domain, path, params);
+            return this->OnFunCall(var_userptr, domain, path, params);
             //return this->_funcall_(var_userptr, domain, path, params);
         }
 
