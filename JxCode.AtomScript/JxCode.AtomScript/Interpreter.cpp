@@ -445,28 +445,40 @@ namespace jxcode::atomscript
                 }
             }
 
+            bool shouldBeComma = false;
+
             for (; index < cmd.targets.size(); index++) {
                 const Token& token = cmd.targets[index];
 
-                //先直接省略逗号
-                if (token.token_type == TokenType::Comma) {
-                    continue;
-                }
-
                 Variable temp_var;
 
-                CheckValidVariableOrLiteral(this, token);
-                if (IsLiteralToken(token)) {
-                    if (token.token_type == TokenType::Number) {
-                        SetVariableNumber(&temp_var, stof(*token.value));
+                //先直接省略逗号
+                if (token.token_type == TokenType::Comma) {
+                    //是逗号直接忽略
+                    if (shouldBeComma) {
+                        shouldBeComma = false;
+                        continue;
                     }
-                    else if (token.token_type == TokenType::String) {
-                        auto strptr = this->NewStrPtr(*token.value);
-                        SetVariableStrPtr(&temp_var, strptr);
-                    }
+                    //是逗号但不应该是逗号，该参数被省略
+                    SetVariableUndefined(&temp_var);
+                    shouldBeComma = false;
                 }
                 else {
-                    temp_var = this->GetVar(*token.value);
+                    //正常获取参数
+                    CheckValidVariableOrLiteral(this, token);
+                    if (IsLiteralToken(token)) {
+                        if (token.token_type == TokenType::Number) {
+                            SetVariableNumber(&temp_var, stof(*token.value));
+                        }
+                        else if (token.token_type == TokenType::String) {
+                            auto strptr = this->NewStrPtr(*token.value);
+                            SetVariableStrPtr(&temp_var, strptr);
+                        }
+                    }
+                    else {
+                        temp_var = this->GetVar(*token.value);
+                    }
+                    shouldBeComma = true;
                 }
 
                 params.push_back(temp_var);

@@ -60,7 +60,7 @@ namespace jxcode
             cur_global_pos = -1;
         }
         inline bool IsNumber(const wchar_t& c) {
-            return c >= 48 && c <= 57;
+            return c >= L'0' && c <= L'9';
         }
 
         inline bool IsString(const wchar_t& c) {
@@ -176,12 +176,12 @@ namespace jxcode
             bool isDecimal = false;
 
             wchar_t c = GetChar();
-            while (IsNumber(c)) {
+            while (IsNumber(c) || c == L'.') {
                 if (c == L'.') {
                     if (isDecimal) {
                         throw LexerException(cur_line + 1, cur_position + 1, L"Number format error");
                     }
-                    continue;
+                    isDecimal = true;
                 }
                 c = NextChar();
                 length++;

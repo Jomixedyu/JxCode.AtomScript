@@ -50,7 +50,7 @@ namespace jxcode::lexer
         ss << this->line;
         ss << L", Position: ";
         ss << this->position;
-        ss << L", Value: " << this->value;
+        ss << L", Value: " << *this->value;
         return ss.str();
     }
 }

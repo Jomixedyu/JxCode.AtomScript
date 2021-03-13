@@ -7,12 +7,6 @@ void SetVariableUndefined(Variable* var)
     var->num = 0;
 }
 
-void SetVariableNull(Variable* var)
-{
-    var->type = VARIABLETYPE_NULL;
-    var->num = 0;
-}
-
 void SetVariableNumber(Variable* var, float num)
 {
     var->type = VARIABLETYPE_NUMBER;
@@ -25,11 +19,24 @@ void SetVariableStrPtr(Variable* var, int ptr)
     var->ptr = ptr;
 }
 
-void SetVariableUserPtr(Variable* var, int user_ptr)
+void SetVariableFuncPtr(Variable* var, int ptr)
+{
+    var->type = VARIABLETYPE_FUNCPTR;
+    var->ptr = ptr;
+}
+
+void SetVariableTablePtr(Variable* var, int ptr)
+{
+    var->type = VARIABLETYPE_TABLEPTR;
+    var->ptr = ptr;
+}
+
+void SetVariableUserPtr(Variable* var, int ptr)
 {
     var->type = VARIABLETYPE_USERPTR;
-    var->ptr = user_ptr;
+    var->ptr = ptr;
 }
+
 Variable GetVariableNumber(float num)
 {
     Variable v;
@@ -41,6 +48,24 @@ Variable GetVariableStrPtr(int ptr)
     Variable var;
     SetVariableStrPtr(&var, ptr);
     return var;
+}
+Variable GetVariableFuncPtr(int ptr)
+{
+    Variable v;
+    SetVariableFuncPtr(&v, ptr);
+    return v;
+}
+Variable GetVariableTablePtr(int ptr)
+{
+    Variable v;
+    SetVariableTablePtr(&v, ptr);
+    return v;
+}
+Variable GetVariableUserPtr(int ptr)
+{
+    Variable v;
+    SetVariableUserPtr(&v, ptr);
+    return v;
 }
 void SerializeVariable(Variable* var, char out[8])
 {
