@@ -43,8 +43,11 @@ namespace jxcode::atomscript
     {
         return (tokens != nullptr) && (cur_ptr < (int)tokens->size() - 1);
     }
-    inline static shared_ptr<Token> Peek(int count)
+    inline static shared_ptr<Token> Peek(size_t count)
     {
+        if (cur_ptr + count >= tokens->size()) {
+            return nullptr;
+        }
         return tokens->at(cur_ptr + count);
     }
     inline static bool PeekExist(int count)
@@ -96,8 +99,21 @@ namespace jxcode::atomscript
 
     inline static bool CheckValidPeek(int i, TokenType_t type)
     {
-        return Peek(i)->token_type == type;
+        auto p = Peek(i);
+        if (p == nullptr) {
+            return false;
+        }
+        return p->token_type == type;
     }
+    inline static bool CheckValidPeek(int i, const wstring& str)
+    {
+        auto p = Peek(i);
+        if (p == nullptr) {
+            return false;
+        }
+        return *p->value == str;
+    }
+
     inline static void AddRange(vector<shared_ptr<Token>>* tokens, int length) {
         for (int i = 0; i < length; i++)
         {
@@ -146,6 +162,8 @@ namespace jxcode::atomscript
             OpCommand cmd = OpCommand();
 
             shared_ptr<Token> token = Peek(1);
+            cmd.op_token = token;
+
             if (token->token_type == TokenType::LF) {
                 NextToken();
                 continue;
@@ -160,12 +178,26 @@ namespace jxcode::atomscript
             else if (*token->value == opcode_goto || token->token_type == TokenType::SingleArrow) {
                 // goto ->
                 NextToken();
-                AssertAfterLength(1);
+                AssertAfterLength(1, 2);
+                static wstring _var = L"var";
                 ThrowParameterException(
-                    (CheckValidPeek(1, TokenType::Ident))
+                    (
+                    CheckValidPeek(1, TokenType::Ident) &&
+                    CheckValidPeek(1, _var) &&
+                    CheckValidPeek(2, TokenType::Ident)
+                ) ||
+                    CheckValidPeek(1, TokenType::Ident)
                 );
+
                 cmd.code = OpCode::Goto;
-                cmd.targets.push_back(NextToken());
+
+                auto var_token = NextToken();
+                cmd.targets.push_back(var_token);
+                //如果有var在添加一个
+                if (*var_token->value == _var) {
+                    cmd.targets.push_back(NextToken());
+                }
+                
             }
             else if (*token->value == opcode_if || token->token_type == TokenType::Question) {
                 // if ?

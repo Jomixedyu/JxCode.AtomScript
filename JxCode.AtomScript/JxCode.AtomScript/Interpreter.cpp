@@ -475,31 +475,28 @@ namespace jxcode::atomscript
         }
         else if (cmd.code == OpCode::If) {
 
-        Variable x = this->GenTempVar(cmd.targets[0]);
-        Variable y = this->GenTempVar(cmd.targets[2]);
+            Variable x = this->GenTempVar(cmd.targets[0]);
+            Variable y = this->GenTempVar(cmd.targets[2]);
 
-        bool _success = VariableOperate(this, cmd.targets[1]->token_type, x, y);
-        //条件不成功则下跳一行
-        if (!_success) {
-            ++this->exec_ptr_;
-        }
+            bool _success = VariableOperate(this, cmd.targets[1]->token_type, x, y);
+            //条件不成功则下跳一行
+            if (!_success) {
+                ++this->exec_ptr_;
+            }
         }
         else if (cmd.code == OpCode::Goto) {
 
             wstring* label = nullptr;
 
-            if (cmd.targets.size() != 1) {
-                throw InterpreterException(cmd.op_token, L"goto语句错误");
+            if (cmd.targets.size() == 1) {
+                label = cmd.targets[0]->value.get();
             }
-            //获取变量
-            Variable var = this->GetVar(*cmd.targets[0]->value);
-            if (var.type == VARIABLETYPE_STRPTR) {
+            else if (cmd.targets.size() == 2) {
+                Variable var = this->GetVar(*cmd.targets[1]->value);
                 label = this->GetString(var.ptr);
             }
-
-            //直接用Ident
-            if (label == nullptr) {
-                label = cmd.targets[0]->value.get();
+            else {
+                throw InterpreterException(cmd.op_token, L"goto语句错误");
             }
 
             //Check

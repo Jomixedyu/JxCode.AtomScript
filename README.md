@@ -187,14 +187,14 @@ goto var target
 符号  
 ```
 $target = "start"
-->var target
+-> var target
 ```
 
 ### 清除所有子变量
-对start执行clear后，删除变量池中名字以 start__ 开头的所有变量  
-```clear start```  
+对var执行clear后，删除变量池中名字以 var__ 开头的所有变量  
+```clear var```  
 符号  
-```~start```
+```~var```
 
 ### 执行函数
 ::在函数调用中为域运算符，一般指定为类型名称空间的路径，.是子对象运算符  
@@ -206,4 +206,4 @@ $target = "start"
 如果表达式运算成立，则执行后面的语句，否则继续向下执行
 ```if a == 0 then goto start```  
 符号  
-```? a == 0 then ->start```
+```? a == 0 then -> start```
