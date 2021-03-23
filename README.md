@@ -203,7 +203,7 @@ $target = "start"
 ```@Atom::Sys.Print: "hello world"```
 
 ### 逻辑
-如果表达式运算成立，则向下继续执行，否则执行goto  
-```if a == 0 else goto start```  
+如果表达式运算成立，则执行后面的语句，否则继续向下执行
+```if a == 0 then goto start```  
 符号  
-```? a == 0 else->start```
+```? a == 0 then ->start```
