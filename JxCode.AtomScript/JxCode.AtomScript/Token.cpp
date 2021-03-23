@@ -30,7 +30,9 @@ namespace jxcode::lexer
         TokenType_t Comma = L"Comma";
         TokenType_t Dot = L"Dot";
         TokenType_t GreaterThan = L"GreaterThan";
+        TokenType_t GreaterThanEqual = L"GreaterThanEqual";
         TokenType_t LessThan = L"LessThan";
+        TokenType_t LessThanEqual = L"LessThanEqual";
         TokenType_t SingleArrow = L"SingleArrow";
         TokenType_t DoubleArrow = L"DoubleArrow";
         TokenType_t Tilde = L"Tilde";
@@ -51,6 +53,18 @@ namespace jxcode::lexer
         ss << L", Position: ";
         ss << this->position;
         ss << L", Value: " << *this->value;
+        ss << L". ";
         return ss.str();
     }
+
+    TokenException::TokenException(const std::shared_ptr<Token>& token, const std::wstring& message)
+        : token_(token), wexceptionbase(message)
+    {
+    }
+
+    std::wstring TokenException::what()
+    {
+        return this->get_name() + this->token_->to_string() + this->message_;
+    }
+
 }

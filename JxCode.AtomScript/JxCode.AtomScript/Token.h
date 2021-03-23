@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <memory>
+#include "wexceptionbase.h"
 
 namespace jxcode::lexer
 {
@@ -32,7 +33,9 @@ namespace jxcode::lexer
         extern TokenType_t Comma;
         extern TokenType_t Dot;
         extern TokenType_t GreaterThan;
+        extern TokenType_t GreaterThanEqual;
         extern TokenType_t LessThan;
+        extern TokenType_t LessThanEqual;
         extern TokenType_t SingleArrow;
         extern TokenType_t DoubleArrow;
         extern TokenType_t Tilde;
@@ -44,13 +47,27 @@ namespace jxcode::lexer
         extern TokenType_t Question;
     }
 
-    struct Token
+    class Token
     {
+    public:
         TokenType_t token_type;
+        std::shared_ptr<std::wstring> program_name;
         std::shared_ptr<std::wstring> value;
         size_t line;
         size_t position;
     public:
         std::wstring to_string() const;
+    };
+
+    class TokenException : public wexceptionbase
+    {
+    protected:
+        std::shared_ptr<Token> token_;
+    protected:
+        virtual std::wstring get_name() = 0;
+    public:
+        TokenException(const std::shared_ptr<Token>& token, const std::wstring& message);
+    public:
+        virtual std::wstring what() override;
     };
 }

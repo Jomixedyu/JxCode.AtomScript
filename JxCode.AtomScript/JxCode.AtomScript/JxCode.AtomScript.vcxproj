@@ -36,6 +36,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DLL.cpp" />
+    <ClCompile Include="wexceptionbase.cpp" />
     <ClCompile Include="Interpreter.cpp" />
     <ClCompile Include="Lexer.cpp" />
     <ClCompile Include="OpCommand.cpp" />
@@ -45,11 +46,11 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DLL.h" />
+    <ClInclude Include="wexceptionbase.h" />
     <ClInclude Include="Interpreter.h" />
     <ClInclude Include="Lexer.h" />
     <ClInclude Include="OpCommand.h" />
     <ClInclude Include="Token.h" />
-    <ClInclude Include="utf8str_ext.h" />
     <ClInclude Include="Variable.h" />
   </ItemGroup>
   <ItemGroup>

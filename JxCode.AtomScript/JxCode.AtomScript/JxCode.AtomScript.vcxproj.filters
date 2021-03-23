@@ -36,6 +36,9 @@
     <ClCompile Include="Variable.cpp">
       <Filter>源文件</Filter>
     </ClCompile>
+    <ClCompile Include="wexceptionbase.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Token.h">
@@ -56,7 +59,7 @@
     <ClInclude Include="Variable.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="utf8str_ext.h">
+    <ClInclude Include="wexceptionbase.h">
       <Filter>头文件</Filter>
     </ClInclude>
   </ItemGroup>

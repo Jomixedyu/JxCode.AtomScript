@@ -23,6 +23,7 @@ struct InterpreterState
 
     LoadFileCallBack _loadfile;
     FunctionCallBack _funcall;
+    ProgramEndingCallBack _end_;
 };
 
 map<int, InterpreterState*> g_inters;
@@ -125,6 +126,11 @@ static bool OnFuncall(int id,
     return inter->_funcall(id, userid, _domain, _path, _var);
 }
 
+static void OnEnd(int id, const wstring& name)
+{
+    auto inter = GetState(id);
+    inter->_end_(id, name.c_str());
+}
 
 void CALLAPI GetErrorMessage(int id, wchar_t* out_str)
 {
@@ -155,20 +161,26 @@ int CALLAPI NewInterpreter(int* out_id)
             const vector<Token>& path,
             const vector<Variable>& params)->bool {
                 return OnFuncall(id, user_type_id, domain, path, params);
+        },
+        [id](const wstring& program_name) {
+            OnEnd(id, program_name);
         });
     g_inters[g_index] = state;
     *out_id = g_index;
     return kSuccess;
 }
 
-int CALLAPI Initialize(int id, LoadFileCallBack _loadfile_, FunctionCallBack _funcall_)
+int CALLAPI Initialize(int id, LoadFileCallBack _loadfile_, FunctionCallBack _funcall_, ProgramEndingCallBack _end_)
 {
     auto inter = GetState(id);
     if (inter == nullptr) {
         return kNullResult;
     }
+
     inter->_loadfile = _loadfile_;
     inter->_funcall = _funcall_;
+    inter->_end_ = _end_;
+
     return kSuccess;
 }
 
@@ -212,7 +224,7 @@ int CALLAPI ExecuteProgram(int id, const wchar_t* file)
     try {
         inter->interpreter->ExecuteProgram(file);
     }
-    catch (atomscript::InterpreterException& e) {
+    catch (wexceptionbase& e) {
         SetErrorMessage(id, e.what().c_str());
         return kErrorMsg;
     }
@@ -228,7 +240,7 @@ int CALLAPI Next(int id)
     try {
         inter->interpreter->Next();
     }
-    catch (atomscript::InterpreterException& e) {
+    catch (wexceptionbase& e) {
         SetErrorMessage(id, e.what().c_str());
         return kErrorMsg;
     }
@@ -250,7 +262,7 @@ int CALLAPI GetProgramName(int id, wchar_t* out_name)
         auto name = inter->interpreter->program_name();
         wcscpy(out_name, name.c_str());
     }
-    catch (atomscript::InterpreterException& e) {
+    catch (wexceptionbase& e) {
         SetErrorMessage(id, e.what().c_str());
         return kErrorMsg;
     }
@@ -267,7 +279,7 @@ int CALLAPI GetVariable(int id, wchar_t* varname, Variable* out_var)
         auto var = inter->interpreter->GetVar(varname);
         *out_var = var;
     }
-    catch (atomscript::InterpreterException& e) {
+    catch (wexceptionbase& e) {
         SetErrorMessage(id, e.what().c_str());
         return kErrorMsg;
     }
@@ -283,7 +295,7 @@ int CALLAPI SetVariable(int id, wchar_t* varname, Variable var)
     try {
         inter->interpreter->SetVar(varname, var);
     }
-    catch (atomscript::InterpreterException& e) {
+    catch (wexceptionbase& e) {
         SetErrorMessage(id, e.what().c_str());
         return kErrorMsg;
     }
@@ -299,7 +311,7 @@ int CALLAPI SetStringVariable(int id, wchar_t* varname, wchar_t* str)
     try {
         inter->interpreter->SetVar(varname, wstring(str));
     }
-    catch (atomscript::InterpreterException& e) {
+    catch (wexceptionbase& e) {
         SetErrorMessage(id, e.what().c_str());
         return kErrorMsg;
     }
@@ -315,7 +327,7 @@ int CALLAPI NewString(int id, wchar_t* str, int* out_ptr)
     try {
         *out_ptr = inter->interpreter->NewStrPtr(str);
     }
-    catch (atomscript::InterpreterException& e) {
+    catch (wexceptionbase& e) {
         SetErrorMessage(id, e.what().c_str());
         return kErrorMsg;
     }
@@ -332,7 +344,7 @@ int CALLAPI GetString(int id, int str_ptr, wchar_t* out_str)
         wstring* str = inter->interpreter->GetString(str_ptr);
         wcscpy(out_str, str->c_str());
     }
-    catch (atomscript::InterpreterException& e) {
+    catch (wexceptionbase& e) {
         SetErrorMessage(id, e.what().c_str());
         return kErrorMsg;
     }
@@ -348,7 +360,7 @@ int CALLAPI GetStringLength(int id, int str_ptr, int* out_length)
     try {
         *out_length = inter->interpreter->GetString(str_ptr)->size() + 1;
     }
-    catch (atomscript::InterpreterException& e) {
+    catch (wexceptionbase& e) {
         SetErrorMessage(id, e.what().c_str());
         return kErrorMsg;
     }
@@ -375,7 +387,7 @@ int CALLAPI SerializeState(int id, int* out_length)
         inter->serialize_data = inter->interpreter->Serialize();
         *out_length = inter->serialize_data.size();
     }
-    catch (atomscript::InterpreterException& e) {
+    catch (wexceptionbase& e) {
         SetErrorMessage(id, e.what().c_str());
 
         return kErrorMsg;
@@ -397,7 +409,7 @@ int CALLAPI TakeSerializationData(int id, char* ser_buf)
         memcpy(ser_buf, inter->serialize_data.c_str(), inter->serialize_data.size());
         inter->serialize_data.clear();
     }
-    catch (atomscript::InterpreterException& e) {
+    catch (wexceptionbase& e) {
         SetErrorMessage(id, e.what().c_str());
         return kErrorMsg;
     }
@@ -413,7 +425,7 @@ int CALLAPI DeserializeState(int id, char* deser_buf, int buf_size)
     try {
         inter->interpreter->Deserialize(string(deser_buf, buf_size));
     }
-    catch (atomscript::InterpreterException& e) {
+    catch (wexceptionbase& e) {
         SetErrorMessage(id, e.what().c_str());
         return kErrorMsg;
     }
@@ -451,7 +463,7 @@ int CALLAPI StatisticVariable(int id, int* number, int* strptr, int* userptr, in
 
         *strpool_count = inter->interpreter->strpool().size();
     }
-    catch (atomscript::InterpreterException& e) {
+    catch (wexceptionbase& e) {
         SetErrorMessage(id, e.what().c_str());
         return kErrorMsg;
     }

@@ -13,9 +13,9 @@ namespace jxcode
         using namespace std;
 
         LexerException::LexerException(const size_t& line, const size_t& pos_, const std::wstring& message)
-            : line_(line), pos_(pos_), message_(message) { }
+            : line_(line), pos_(pos_), wexceptionbase(message) { }
 
-        wstring LexerException::what() const
+        std::wstring LexerException::what()
         {
             wstringstream ss;
             ss << L"line: " << this->line_ << L", pos: " << this->pos_ << L"  ";
@@ -356,7 +356,7 @@ namespace jxcode
                 return false;
             return true;
         }
-        vector<Token> Scanner(
+        std::vector<shared_ptr<Token>> Scanner(
             wstring* code,
             map<wstring, TokenType_t>* tokenList,
             std::map<std::wstring, std::wstring>* escMap
@@ -365,7 +365,8 @@ namespace jxcode
             code_content = code;
             token_map = tokenList;
             esc_char_map = escMap;
-            vector<Token> tokens;
+
+            vector<shared_ptr<Token>> tokens;
             Token token;
             cur_line = 0;
 
@@ -378,7 +379,7 @@ namespace jxcode
                 else if (type == TokenType::LF && !scan_is_parse_lf) {
                     continue;
                 }
-                tokens.push_back(token);
+                tokens.push_back(make_shared<Token>(token));
             }
             return tokens;
         }

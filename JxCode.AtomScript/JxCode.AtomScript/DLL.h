@@ -31,13 +31,14 @@ typedef struct
 
 typedef wchar_t* (*LoadFileCallBack)(int id, const wchar_t* path);
 typedef int(*FunctionCallBack)(int id, int user_ptr, TokenGroup domain, TokenGroup path, VariableGroup params);
+typedef void(*ProgramEndingCallBack)(int id, const wchar_t* programName);
 
 #ifdef __cplusplus
 extern "C" {
 #endif
     DLLEXPORT void CALLAPI GetErrorMessage(int id, wchar_t* out_str);
     DLLEXPORT int CALLAPI NewInterpreter(int* id);
-    DLLEXPORT int CALLAPI Initialize(int id, LoadFileCallBack _loadfile_, FunctionCallBack _funcall_);
+    DLLEXPORT int CALLAPI Initialize(int id, LoadFileCallBack _loadfile_, FunctionCallBack _funcall_, ProgramEndingCallBack _end_);
 
     DLLEXPORT void CALLAPI Terminate(int id);
     DLLEXPORT int CALLAPI ResetState(int id);

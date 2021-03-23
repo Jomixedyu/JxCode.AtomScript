@@ -31,7 +31,7 @@ int main() {
     using namespace jxcode::atomscript;
 
     wstring dir(L"C:\\Users\\Jayshonyves\\Desktop\\");
-    wstring path(L"C:\\Users\\Jayshonyves\\Desktop\\eazytest.txt");
+    wstring path(L"C:\\Users\\Jayshonyves\\Desktop\\atom.txt");
 
     int id = 0;
     NewInterpreter(&id);
@@ -46,19 +46,11 @@ int main() {
         [](int id, int user_type_id, TokenGroup domain, TokenGroup path, VariableGroup params)->int {
             wcout << user_type_id << endl;
             return false;
+        },
+        [](int id, const wchar_t* name)->void {
+
         });
 
-    ExecuteProgram(id, L"eazytest");
+    ExecuteProgram(id, L"atom");
     Next(id);
-
-    int length = 0;
-    SerializeState(id, &length);
-    char* buf = new char[length];
-    TakeSerializationData(id, buf);
-
-    DeserializeState(id, buf, length);
-    
-    wchar_t wc[32];
-    GetProgramName(id, wc);
-
 }

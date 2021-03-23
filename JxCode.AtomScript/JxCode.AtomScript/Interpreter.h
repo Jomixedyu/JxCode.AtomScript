@@ -19,18 +19,16 @@ namespace jxcode::atomscript
     using std::shared_ptr;
     using std::function;
     using lexer::Token;
+    using lexer::TokenException;
 
-    class InterpreterException
+    class InterpreterException : public TokenException
     {
     protected:
-        std::wstring message_;
-        lexer::Token token_;
+        virtual std::wstring get_name() override;
     public:
-
+        InterpreterException(const std::shared_ptr<Token>& token, const std::wstring& message);
     public:
-        InterpreterException(const lexer::Token& token, const std::wstring& message);
-    public:
-        virtual std::wstring what() const;
+        virtual std::wstring what() override;
     };
 
     class Interpreter
@@ -43,17 +41,23 @@ namespace jxcode::atomscript
             const vector<Token>& domain,
             const vector<Token>& path,
             const vector<Variable>& params)>;
+        using EndCallBack = function<void(const wstring& program_name)>;
     protected:
         LoadFileCallBack _loadfile_;
         FuncallCallBack _funcall_;
+        EndCallBack _end_;
+
         bool OnFunCall(const int32_t& user_ptr,
             const vector<Token>& domain,
             const vector<Token>& path,
             const vector<Variable>& params);
 
         wstring program_name_; //ser
+        bool is_end_; // 当前脚本运行是否结束
 
-        vector<OpCommand> commands_;
+        map<wstring, shared_ptr<vector<OpCommand>>> commands_cache_; // TODO 功能搁置
+        shared_ptr<vector<OpCommand>> commands_;
+
         int32_t exec_ptr_; //ser
         map<wstring, size_t> labels_;
 
@@ -69,9 +73,13 @@ namespace jxcode::atomscript
     public:
         Interpreter(
             LoadFileCallBack _loadfile_,
-            FuncallCallBack _funcall_);
+            FuncallCallBack _funcall_,
+            EndCallBack _end_);
     protected:
         bool ExecuteLine(const OpCommand& cmd);
+        Variable GenTempVar(const std::shared_ptr<Token>& token);
+        Variable GenTempVar(const float& num);
+        Variable GenTempVar(const wstring& str);
     public:
         bool IsExistLabel(const wstring& label);
         void SetVar(const wstring& name, const float& num);
@@ -87,7 +95,7 @@ namespace jxcode::atomscript
         void GCollect();
         void SetReturnVariable(const Variable& var);
     public:
-        Interpreter* ExecuteProgram(const wstring& program_name_);
+        Interpreter* ExecuteProgram(const wstring& program_name);
         //返回是否运行结束
         bool Next();
 

@@ -12,14 +12,30 @@ namespace jxcode::atomscript
     using namespace lexer;
 
 #pragma region InterpreterException
-    InterpreterException::InterpreterException(const lexer::Token& token, const std::wstring& message)
-        : token_(token), message_(message) {}
 
-    std::wstring InterpreterException::what() const
+    std::wstring InterpreterException::get_name()
     {
-        return this->token_.to_string();
+        return L"InterpreterException";
+    }
+
+    InterpreterException::InterpreterException(const std::shared_ptr<Token>& token, const std::wstring& message)
+        : TokenException(token, message)
+    {
+    }
+
+    std::wstring InterpreterException::what()
+    {
+        return this->message_ + L".  " + this->token_->to_string();
     }
 #pragma endregion
+
+
+    static map<wstring, vector<OpCommand>> op_cache = map<wstring, vector<OpCommand>>();
+
+    static bool exist_op_cache(const wstring& program_name)
+    {
+        return op_cache.count(program_name) > 0;
+    }
 
 
 #pragma region Interpreter
@@ -34,7 +50,7 @@ namespace jxcode::atomscript
         if (domain.size() == 1 && *domain[0].value == mathStr) {
             const wstring& p = *path[0].value;
 
-            for (int i = params.size() - 1; i >= 0; i--) {
+            for (int i = (int)params.size() - 1; i >= 0; i--) {
                 vars.push(params[i]);
             }
 
@@ -47,7 +63,7 @@ namespace jxcode::atomscript
         else if (domain.size() == 1 && *domain[0].value == strlibStr) {
             const wstring& p = *path[0].value;
 
-            for (int i = params.size() - 1; i >= 0; i--) {
+            for (int i = (int)params.size() - 1; i >= 0; i--) {
                 vars.push(params[i]);
             }
 
@@ -68,7 +84,7 @@ namespace jxcode::atomscript
     }
     size_t Interpreter::opcmd_count() const
     {
-        return this->commands_.size();
+        return this->commands_->size();
     }
     const wstring& Interpreter::program_name() const
     {
@@ -82,8 +98,8 @@ namespace jxcode::atomscript
     {
         return this->strpool_;
     }
-    Interpreter::Interpreter(LoadFileCallBack _loadfile_, FuncallCallBack _funcall_)
-        : ptr_alloc_index_(0), exec_ptr_(-1), _loadfile_(_loadfile_), _funcall_(_funcall_)
+    Interpreter::Interpreter(LoadFileCallBack _loadfile_, FuncallCallBack _funcall_, EndCallBack _end_)
+        : ptr_alloc_index_(0), is_end_(false), exec_ptr_(-1), _loadfile_(_loadfile_), _funcall_(_funcall_), _end_(_end_)
     {
     }
 
@@ -205,21 +221,22 @@ namespace jxcode::atomscript
         this->SetVar(L"__return", var);
     }
 
-    inline static bool IsLiteralToken(const Token& token) {
-        return token.token_type == TokenType::Number || token.token_type == TokenType::String;
+    inline static bool IsLiteralToken(const shared_ptr<Token>& token) {
+        return token->token_type == TokenType::Number || token->token_type == TokenType::String;
     }
-    inline static bool IsLiteralOrVarStrToken(Interpreter* inter, const Token& token) {
-        if (token.token_type == TokenType::String) {
+    inline static bool IsLiteralOrVarStrToken(Interpreter* inter, const shared_ptr<Token>& token) {
+        if (token->token_type == TokenType::String) {
             return true;
         }
-        if (token.token_type == TokenType::Ident) {
-            auto var = inter->GetVar(*token.value);
+        if (token->token_type == TokenType::Ident) {
+            auto var = inter->GetVar(*token->value);
             if (var.type == VARIABLETYPE_STRPTR) {
                 return true;
             }
         }
         return false;
     }
+
     inline static void CheckValidLength(const OpCommand& cmd, int length) {
         auto size = cmd.targets.size();
         if (size != length) {
@@ -232,41 +249,101 @@ namespace jxcode::atomscript
             throw InterpreterException(cmd.op_token, L"arguments error");
         }
     }
-    inline static void CheckValidIdent(const Token& token) {
-        if (token.token_type != TokenType::Ident) {
+    inline static void CheckValidIdent(const shared_ptr<Token>& token) {
+        if (token->token_type != TokenType::Ident) {
             throw InterpreterException(token, L"argument not is ident");
         }
     }
-    inline static void CheckValidTokenType(const Token& token, const TokenType_t& type) {
-        if (token.token_type != type) {
+    inline static void CheckValidTokenType(const shared_ptr<Token>& token, const TokenType_t& type) {
+        if (token->token_type != type) {
             throw InterpreterException(token, L"token type error");
         }
     }
-    inline static void CheckValidStrVarOrStrLiteral(Interpreter* inter, const Token& token) {
+    inline static void CheckValidStrVarOrStrLiteral(Interpreter* inter, const shared_ptr<Token>& token) {
         if (!IsLiteralOrVarStrToken(inter, token)) {
             throw InterpreterException(token, L"type error");
         }
     }
-    inline static void CheckValidVariable(Interpreter* inter, const Token& token) {
-        auto var = inter->GetVar(*token.value);
+    inline static void CheckValidVariable(Interpreter* inter, const shared_ptr<Token>& token) {
+        auto var = inter->GetVar(*token->value);
         if (var.type == VARIABLETYPE_UNDEFINED) {
             throw InterpreterException(token, L"variable undefined");
         }
     }
-    inline static void CheckValidVariableOrLiteral(Interpreter* inter, const Token& token) {
+    inline static void CheckValidVariableOrLiteral(Interpreter* inter, const shared_ptr<Token>& token) {
         //不是字面值 并且 变量不存在
         if (!IsLiteralToken(token)
-            && inter->GetVar(*token.value).type == VARIABLETYPE_UNDEFINED)
+            && inter->GetVar(*token->value).type == VARIABLETYPE_UNDEFINED)
         {
             throw InterpreterException(token, L"variable undefined");
         }
     }
-    inline static void CheckValidVariableType(const Token& token, const Variable& var, int type) {
+    inline static void CheckValidVariableType(const shared_ptr<Token>& token, const Variable& var, int type) {
         if (var.type != type) {
             throw InterpreterException(token, L"variable type error");
         }
     }
 
+    inline static bool NumberOperate(TokenType_t eqtype, const Variable& x, const Variable& y) {
+        if (eqtype == TokenType::DoubleEqual) {
+            return x.num == y.num;
+        }
+        else if (eqtype == TokenType::ExclamatoryAndEqual) {
+            return x.num != y.num;
+        }
+        else if (eqtype == TokenType::GreaterThan) {
+            return x.num > y.num;
+        }
+        else if (eqtype == TokenType::GreaterThanEqual) {
+            return x.num >= y.num;
+        }
+        else if (eqtype == TokenType::LessThan) {
+            return x.num < y.num;
+        }
+        else if (eqtype == TokenType::LessThanEqual) {
+            return x.num <= y.num;
+        }
+        return false;
+    }
+    inline static bool StrptrOperate(Interpreter* inter, TokenType_t eqtype, const Variable& x, const Variable& y) {
+
+        if (eqtype == TokenType::DoubleEqual) {
+            if (x.ptr == y.ptr) {
+                return true;
+            }
+            return *inter->GetString(x.ptr) == *inter->GetString(y.ptr);
+        }
+        else if (eqtype == TokenType::ExclamatoryAndEqual) {
+            if (x.ptr != y.ptr) {
+                return true;
+            }
+            return *inter->GetString(x.ptr) != *inter->GetString(y.ptr);
+        }
+        return false;
+    }
+
+    inline static bool VariableOperate(Interpreter* inter, TokenType_t eqtype, const Variable& x, const Variable& y) {
+        if (x.type != y.type) {
+            return false;
+        }
+        switch (x.type) {
+            case VARIABLETYPE_NUMBER:
+                return NumberOperate(eqtype, x, y);
+            case VARIABLETYPE_STRPTR:
+                return StrptrOperate(inter, eqtype, x, y);
+            case VARIABLETYPE_TABLEPTR:
+            case VARIABLETYPE_FUNCPTR:
+            case VARIABLETYPE_USERPTR:
+                if (eqtype == TokenType::DoubleEqual) {
+                    return x.ptr == y.ptr;
+                }
+                else if (eqtype == TokenType::ExclamatoryAndEqual) {
+                    return x.ptr != y.ptr;
+                }
+                break;
+        }
+        return false;
+    }
 
     void Interpreter::ResetState()
     {
@@ -283,104 +360,9 @@ namespace jxcode::atomscript
         if (cmd.code == OpCode::Unknow) {
             throw InterpreterException(cmd.op_token, L"unknow opcode");
         }
-        if (cmd.code == OpCode::Label) {
-            //ignore;
-        }
-        else if (cmd.code == OpCode::Goto) {
-            wstring* label;
-            if (cmd.targets.size() == 2 && *cmd.targets[0].value == L"var") {
-                //goto var a
-                CheckValidIdent(cmd.targets[0]);
-                CheckValidStrVarOrStrLiteral(this, cmd.targets[1]);
-
-                Variable var = this->GetVar(*cmd.targets[1].value);
-                label = this->GetString(var.ptr);
-            }
-            else if (cmd.targets.size() == 1) {
-                //goto label
-                CheckValidStrVarOrStrLiteral(this, cmd.targets[0]);
-                label = cmd.targets[0].value.get();
-            }
-            else {
-                throw InterpreterException(cmd.op_token, L"goto语句错误");
-            }
-            //Check
-            if (this->labels_.find(*label) == this->labels_.end()) {
-                throw InterpreterException(cmd.op_token, L"Label不存在");
-            }
-            //jump
-            size_t pos = this->labels_[*label];
-            this->exec_ptr_ = pos;
-        }
-        else if (cmd.code == OpCode::Set) {
-            //暂时不用表达式，只使用一个值 暂时就三个
-            CheckValidLength(cmd, 3);
-            CheckValidIdent(cmd.targets[0]);
-            CheckValidTokenType(cmd.targets[1], TokenType::Equal);
-
-            wstring& varname = *cmd.targets[0].value;
-
-            if (cmd.targets[2].token_type == TokenType::Number) {
-                this->SetVar(varname, std::stof(*cmd.targets[2].value));
-            }
-            else if (cmd.targets[2].token_type == TokenType::String)
-            {
-                this->SetVar(varname, *cmd.targets[2].value);
-            }
-            else if (cmd.targets[2].token_type == TokenType::Ident) {
-                Variable v = this->GetVar(*cmd.targets[2].value);
-                if (v.type == VARIABLETYPE_UNDEFINED) {
-                    throw InterpreterException(cmd.targets[2], L"variable not found");
-                }
-                this->SetVar(varname, v);
-            }
-        }
-        else if (cmd.code == OpCode::Del) {
-            CheckValidLength(cmd, 1);
-            CheckValidIdent(cmd.targets[0]);
-            this->DelVar(*cmd.targets[0].value);
-        }
-        else if (cmd.code == OpCode::JumpFile) {
-            wstring* pfilestr;
-            CheckValidLength(cmd, 1);
-            Token token = cmd.targets[0];
-            CheckValidStrVarOrStrLiteral(this, token);
-
-            if (token.token_type == TokenType::Ident) {
-                auto var = this->GetVar(*token.value);
-                pfilestr = this->GetString(var.ptr);
-            }
-            else {
-                pfilestr = token.value.get();
-            }
-            this->ExecuteProgram(*pfilestr);
-        }
-        else if (cmd.code == OpCode::If) {
-            //暂时不做表达式，目前只可用==号判断
-
-        }
-        else if (cmd.code == OpCode::ClearSubVar) {
-            //清理子变量
-            //子变量规则，Obj__subvar
-            CheckValidLength(cmd, 1);
-            CheckValidIdent(cmd.targets[0]);
-
-            auto target = cmd.targets[0].value;
-
-            auto it = this->variables_.begin();
-            while (it != this->variables_.end()) {
-                wstring name = it->first;
-                if (name.length() > target->length() + 2 && name.substr(0, target->length() + 2) == *target + L"__") {
-                    this->variables_.erase(it++);
-                }
-                else {
-                    it++;
-                }
-            }
-        }
         else if (cmd.code == OpCode::Call) {
             //
-            Variable var = this->GetVar(*cmd.targets[0].value);
+            Variable var = this->GetVar(*cmd.targets[0]->value);
 
             vector<Token> domain;
             vector<Token> path;
@@ -410,18 +392,18 @@ namespace jxcode::atomscript
             }
 
             for (; index < cmd.targets.size(); index++) {
-                const Token& token = cmd.targets[index];
+                auto token = cmd.targets[index];
 
                 if (is_symbol) {
-                    if (token.token_type == TokenType::DoubleColon) {
+                    if (token->token_type == TokenType::DoubleColon) {
                         //域运算符
                         is_last_domain = true;
                     }
-                    else if (token.token_type == TokenType::Dot) {
+                    else if (token->token_type == TokenType::Dot) {
                         //子对象运算符
                         is_last_path = true;
                     }
-                    else if (token.token_type == TokenType::Colon) {
+                    else if (token->token_type == TokenType::Colon) {
                         //函数运算符，退出
                         index++;
                         break;
@@ -433,11 +415,11 @@ namespace jxcode::atomscript
                 }
                 else {
                     if (is_last_domain) {
-                        domain.push_back(cmd.targets[index]);
+                        domain.push_back(*cmd.targets[index]);
                         is_last_domain = false;
                     }
                     if (is_last_path) {
-                        path.push_back(cmd.targets[index]);
+                        path.push_back(*cmd.targets[index]);
                         is_last_path = false;
                     }
 
@@ -448,12 +430,12 @@ namespace jxcode::atomscript
             bool shouldBeComma = false;
 
             for (; index < cmd.targets.size(); index++) {
-                const Token& token = cmd.targets[index];
+                auto token = cmd.targets[index];
 
                 Variable temp_var;
 
                 //先直接省略逗号
-                if (token.token_type == TokenType::Comma) {
+                if (token->token_type == TokenType::Comma) {
                     //是逗号直接忽略
                     if (shouldBeComma) {
                         shouldBeComma = false;
@@ -467,16 +449,16 @@ namespace jxcode::atomscript
                     //正常获取参数
                     CheckValidVariableOrLiteral(this, token);
                     if (IsLiteralToken(token)) {
-                        if (token.token_type == TokenType::Number) {
-                            SetVariableNumber(&temp_var, stof(*token.value));
+                        if (token->token_type == TokenType::Number) {
+                            SetVariableNumber(&temp_var, stof(*token->value));
                         }
-                        else if (token.token_type == TokenType::String) {
-                            auto strptr = this->NewStrPtr(*token.value);
+                        else if (token->token_type == TokenType::String) {
+                            auto strptr = this->NewStrPtr(*token->value);
                             SetVariableStrPtr(&temp_var, strptr);
                         }
                     }
                     else {
-                        temp_var = this->GetVar(*token.value);
+                        temp_var = this->GetVar(*token->value);
                     }
                     shouldBeComma = true;
                 }
@@ -488,8 +470,146 @@ namespace jxcode::atomscript
             return this->OnFunCall(var_userptr, domain, path, params);
             //return this->_funcall_(var_userptr, domain, path, params);
         }
+        else if (cmd.code == OpCode::Label) {
+            //ignore;
+        }
+        else if (cmd.code == OpCode::If) {
+
+        Variable x = this->GenTempVar(cmd.targets[0]);
+        Variable y = this->GenTempVar(cmd.targets[2]);
+
+        bool _success = VariableOperate(this, cmd.targets[1]->token_type, x, y);
+        //条件不成功则下跳一行
+        if (!_success) {
+            ++this->exec_ptr_;
+        }
+        }
+        else if (cmd.code == OpCode::Goto) {
+
+            wstring* label = nullptr;
+
+            if (cmd.targets.size() != 1) {
+                throw InterpreterException(cmd.op_token, L"goto语句错误");
+            }
+            //获取变量
+            Variable var = this->GetVar(*cmd.targets[0]->value);
+            if (var.type == VARIABLETYPE_STRPTR) {
+                label = this->GetString(var.ptr);
+            }
+
+            //直接用Ident
+            if (label == nullptr) {
+                label = cmd.targets[0]->value.get();
+            }
+
+            //Check
+            if (!this->IsExistLabel(*label)) {
+                throw InterpreterException(cmd.op_token, L"Label not found.");
+            }
+            //jump
+            int32_t pos = (int32_t)this->labels_[*label];
+            this->exec_ptr_ = pos;
+        }
+        else if (cmd.code == OpCode::Set) {
+            //暂时不用表达式，只使用一个值 暂时就三个
+            CheckValidLength(cmd, 3);
+            CheckValidIdent(cmd.targets[0]);
+            CheckValidTokenType(cmd.targets[1], TokenType::Equal);
+
+            wstring& varname = *cmd.targets[0]->value;
+
+            if (cmd.targets[2]->token_type == TokenType::Number) {
+                this->SetVar(varname, std::stof(*cmd.targets[2]->value));
+            }
+            else if (cmd.targets[2]->token_type == TokenType::String)
+            {
+                this->SetVar(varname, *cmd.targets[2]->value);
+            }
+            else if (cmd.targets[2]->token_type == TokenType::Ident) {
+                Variable v = this->GetVar(*cmd.targets[2]->value);
+                if (v.type == VARIABLETYPE_UNDEFINED) {
+                    throw InterpreterException(cmd.targets[2], L"variable not found");
+                }
+                this->SetVar(varname, v);
+            }
+        }
+        else if (cmd.code == OpCode::Del) {
+            CheckValidLength(cmd, 1);
+            CheckValidIdent(cmd.targets[0]);
+            this->DelVar(*cmd.targets[0]->value);
+        }
+        else if (cmd.code == OpCode::JumpFile) {
+            wstring* pfilestr;
+            CheckValidLength(cmd, 1);
+            auto token = cmd.targets[0];
+            CheckValidStrVarOrStrLiteral(this, token);
+
+            if (token->token_type == TokenType::Ident) {
+                auto var = this->GetVar(*token->value);
+                pfilestr = this->GetString(var.ptr);
+            }
+            else {
+                pfilestr = token->value.get();
+            }
+            this->ExecuteProgram(*pfilestr);
+        }
+        else if (cmd.code == OpCode::ClearSubVar) {
+            //清理子变量
+            //子变量规则，Obj__subvar
+            CheckValidLength(cmd, 1);
+            CheckValidIdent(cmd.targets[0]);
+
+            auto target = cmd.targets[0]->value;
+
+            auto it = this->variables_.begin();
+            while (it != this->variables_.end()) {
+                wstring name = it->first;
+                if (name.length() > target->length() + 2 && name.substr(0, target->length() + 2) == *target + L"__") {
+                    this->variables_.erase(it++);
+                }
+                else {
+                    it++;
+                }
+            }
+        }
 
         return true;
+    }
+
+    Variable Interpreter::GenTempVar(const std::shared_ptr<Token>& token)
+    {
+        //有变量就直接返回
+        Variable v = this->GetVar(*token->value);
+        if (v.type != VARIABLETYPE_UNDEFINED) {
+            return v;
+        }
+
+        if (token->token_type == TokenType::Number) {
+            v = this->GenTempVar(stof(*token->value));
+        }
+        else if (token->token_type == TokenType::String) {
+            v = this->GenTempVar(*token->value);
+        }
+        else {
+            SetVariableUndefined(&v);
+        }
+
+        return v;
+    }
+
+    Variable Interpreter::GenTempVar(const float& num)
+    {
+        Variable v;
+        SetVariableNumber(&v, num);
+        return v;
+    }
+
+    Variable Interpreter::GenTempVar(const wstring& str)
+    {
+        int strptr = this->NewStrPtr(str);
+        Variable v;
+        SetVariableStrPtr(&v, strptr);
+        return v;
     }
 
     static map<wstring, TokenType_t> get_atom_operator_map() {
@@ -512,6 +632,7 @@ namespace jxcode::atomscript
         mp[L">"] = TokenType::GreaterThan;
         mp[L"<"] = TokenType::LessThan;
 
+
         mp[L"~"] = TokenType::Tilde;
         mp[L"!"] = TokenType::Exclamatory;
         mp[L"@"] = TokenType::At;
@@ -519,29 +640,35 @@ namespace jxcode::atomscript
         mp[L"$"] = TokenType::Doller;
         mp[L"%"] = TokenType::Precent;
 
+        mp[L"?"] = TokenType::Question;
+
         mp[L"->"] = TokenType::SingleArrow;
         mp[L"=>"] = TokenType::DoubleArrow;
 
         return mp;
     }
 
-    Interpreter* Interpreter::ExecuteProgram(const wstring& program_name_)
+    Interpreter* Interpreter::ExecuteProgram(const wstring& program_name)
     {
         this->ResetState();
+        this->GCollect();
+        this->is_end_ = false;
 
-        this->program_name_ = program_name_;
-        wstring code = this->_loadfile_(program_name_);
+        this->program_name_ = program_name;
 
-        auto tokens = lexer::Scanner(&const_cast<wstring&>(code),
+        wstring code = this->_loadfile_(program_name);
+
+        vector<shared_ptr<Token>> tokens = lexer::Scanner(&const_cast<wstring&>(code),
             &get_atom_operator_map(),
-            &lexer::get_std_esc_char_map());
+            &lexer::get_std_esc_char_map()
+        );
 
-        this->commands_ = ParseOpList(tokens);
+        this->commands_ = ParseOpList(&const_cast<wstring&>(program_name), &tokens);
 
         //获取所有标签
-        for (size_t i = 0; i < this->commands_.size(); i++) {
-            const OpCommand& item = this->commands_[i];
-            const wstring& token_value = *item.targets[0].value;
+        for (size_t i = 0; i < this->commands_->size(); i++) {
+            const OpCommand& item = this->commands_->at(i);
+            const wstring& token_value = *item.targets[0]->value;
             if (item.code == OpCode::Label) {
                 this->labels_[token_value] = i;
             }
@@ -551,32 +678,26 @@ namespace jxcode::atomscript
 
     bool Interpreter::Next()
     {
-        //check
-        if (this->exec_ptr_ + 1 >= (int32_t)this->opcmd_count()) {
-            this->ResetState();
+        if (this->is_end_) {
             return false;
         }
 
-        bool is_next = false;
-        //execute
-        ++this->exec_ptr_;
-
-        while (is_next = this->ExecuteLine(this->commands_[this->exec_ptr_])) {
-            ++this->exec_ptr_;
-            //每隔128行执行一次GC
-            if (this->exec_ptr_ % 128 == 0) {
-                this->GCollect();
-            }
-            //check range
-            if (this->exec_ptr_ >= (int32_t)this->opcmd_count()) {
+        do {
+            if (this->exec_ptr_ + 1 >= (int32_t)this->opcmd_count()) {
+                this->is_end_ = true;
+                this->_end_(this->program_name_);
                 this->ResetState();
                 return false;
             }
-            else {
-                //监控
-                int line = this->commands_[this->exec_ptr_].op_token.line;
+
+            ++this->exec_ptr_;
+
+            //每隔256行执行一次GC
+            if (this->exec_ptr_ > 0 && this->exec_ptr_ % 256 == 0) {
+                this->GCollect();
             }
-        }
+
+        } while (this->ExecuteLine(this->commands_->at(this->exec_ptr_)));
 
         return true;
     }
@@ -601,7 +722,7 @@ namespace jxcode::atomscript
     }
     inline static void StreamWriteString(ostream* stream, const string& str)
     {
-        int32_t size = str.size();
+        int32_t size = (int32_t)str.size();
         StreamWriteInt32(stream, size + 1);
         stream->write(str.c_str(), size);
         stream->write("\0", 1);
@@ -671,7 +792,7 @@ namespace jxcode::atomscript
         stringstream ss(data);
         std::wstring_convert<std::codecvt_utf8<wchar_t>> c;
 
-        wstring program_name = c.from_bytes(StreamReadString(&ss));
+        wstring program_name = (c.from_bytes(StreamReadString(&ss)));
         this->ExecuteProgram(program_name);
         this->exec_ptr_ = StreamReadInt32(&ss);
         this->ptr_alloc_index_ = StreamReadInt32(&ss);

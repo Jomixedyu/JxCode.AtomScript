@@ -2,23 +2,21 @@
 #include <string>
 #include <map>
 #include "Token.h"
+#include "wexceptionbase.h"
 
 namespace jxcode
 {
     namespace lexer
     {
-        class LexerException
+        class LexerException : public wexceptionbase
         {
         protected:
-            std::wstring message_;
             size_t line_;
             size_t pos_;
         public:
-
-        public:
             LexerException(const size_t& line, const size_t& pos_, const std::wstring& message);
         public:
-            virtual std::wstring what() const;
+            virtual std::wstring what() override;
         };
 
 
@@ -33,7 +31,7 @@ namespace jxcode
         extern std::wstring scan_multiline_note_lbracket_opr;
         extern std::wstring scan_multiline_note_rbracket_opr;
 
-        std::vector<Token> Scanner(
+        std::vector<std::shared_ptr<Token>> Scanner(
             std::wstring* code,
             std::map<std::wstring, TokenType_t>* tokenList,
             std::map<std::wstring, std::wstring>* escMap
