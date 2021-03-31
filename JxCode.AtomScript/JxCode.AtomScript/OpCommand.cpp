@@ -83,7 +83,7 @@ namespace jxcode::atomscript
 
         for (int i = 1; i <= max; i++)
         {
-            if (Peek(i) != nullptr || Peek(i)->token_type != TokenType::LF) {
+            if (Peek(i) != nullptr && Peek(i)->token_type != TokenType::LF) {
                 ++count;
             }
         }

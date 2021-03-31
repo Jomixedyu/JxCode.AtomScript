@@ -137,7 +137,7 @@ namespace jxcode
             if ((int)code_content->length() <= cur_global_pos + offset) {
                 return 0;
             }
-            return (*code_content)[cur_global_pos + offset];
+            return (*code_content)[(size_t)cur_global_pos + (size_t)offset];
         }
 
         inline bool is_cur_singleline_note() {
@@ -179,7 +179,7 @@ namespace jxcode
             while (IsNumber(c) || c == L'.') {
                 if (c == L'.') {
                     if (isDecimal) {
-                        throw LexerException(cur_line + 1, cur_position + 1, L"Number format error");
+                        throw LexerException((size_t)cur_line + 1, (size_t)cur_position + 1, L"Number format error");
                     }
                     isDecimal = true;
                 }
@@ -190,29 +190,54 @@ namespace jxcode
             return code_content->substr(first, length);
         }
         wstring GetString() {
-            NextChar();
+
             wchar_t c;
             int len = 0;
+            wstring appstr;
             while (true) {
-                c = PeekChar(len);
+                c = PeekChar();
+
                 if (c == 0) {
-                    throw LexerException(cur_line + 1, cur_position + 1, L"字符串没有结尾");
+                    throw LexerException((size_t)cur_line + 1, (size_t)cur_position + 1, L"字符串没有结尾");
                 }
 
                 //是转移符则跳过下个字符
                 if (c == scan_string_escape_char) {
-                    len += 2;
+                    const wstring* ref1 = nullptr;
+                    const wstring* ref2 = nullptr;
+                    for (auto& item : *esc_char_map) {
+                        int count = 0;
+                        for (int i = 0; i < item.first.length(); i++)
+                        {
+                            if (PeekChar(i + 2) == item.first[i]) {
+                                count++;
+                            }
+                        }
+                        if (item.first.length() == count) {
+                            ref1 = &item.first;
+                            ref2 = &item.second;
+                            break;
+                        }
+                    }
+                    if (ref2 == nullptr) {
+                        throw LexerException((size_t)cur_line + 1, (size_t)cur_position + 1, L"字符串转义错误");
+                    }
+                    appstr += *ref2;
+                    Next(1 + ref1->length()); // \n
                     continue;
                 }
                 //字符串结束符
                 if (c == scan_string_bracket) {
+                    NextChar();
                     break;
                 }
-                len++;
+
+                appstr += c;
+                NextChar();
             }
-            wstring str = (*code_content).substr(cur_global_pos, len);
-            Next(len + 1);
-            return str;
+            
+            NextChar(); // "
+            return appstr;
         }
         wstring GetSymbol(TokenType_t* type) {
             vector<wstring> matchList;
