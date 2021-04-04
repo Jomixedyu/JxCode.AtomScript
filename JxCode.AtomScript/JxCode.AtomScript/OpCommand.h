@@ -5,29 +5,27 @@
 
 namespace jxcode::atomscript
 {
-    using OpCode_t = const wchar_t*;
-    namespace OpCode {
-        extern OpCode_t Unknow;
-        extern OpCode_t Call;
-        extern OpCode_t Jump;
-        extern OpCode_t Label;
-        extern OpCode_t Goto;
-        extern OpCode_t If;
-        extern OpCode_t Set;
-        extern OpCode_t Del;
-        extern OpCode_t ClearSubVar;
-        extern OpCode_t JumpFile;
-    }
-
+    enum class OpCode
+    {
+        Unknow,
+        Call,
+        Label,
+        Goto,
+        If,
+        Set,
+        Del,
+        ClearSub,
+        ToProg,
+    };
     struct OpCommand 
     {
-        OpCode_t code;
+        OpCode code;
         std::shared_ptr<lexer::Token> op_token;
         std::vector<std::shared_ptr<lexer::Token>> targets;
 
         OpCommand();
         OpCommand(
-            const OpCode_t& code,
+            const OpCode& code,
             const std::shared_ptr<lexer::Token>& optoken, 
             const std::vector<std::shared_ptr<lexer::Token>>& targets);
 

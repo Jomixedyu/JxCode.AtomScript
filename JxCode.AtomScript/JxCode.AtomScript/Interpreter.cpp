@@ -254,7 +254,7 @@ namespace jxcode::atomscript
             throw InterpreterException(token, L"argument not is ident");
         }
     }
-    inline static void CheckValidTokenType(const shared_ptr<Token>& token, const TokenType_t& type) {
+    inline static void CheckValidTokenType(const shared_ptr<Token>& token, const TokenType& type) {
         if (token->token_type != type) {
             throw InterpreterException(token, L"token type error");
         }
@@ -284,7 +284,7 @@ namespace jxcode::atomscript
         }
     }
 
-    inline static bool NumberOperate(TokenType_t eqtype, const Variable& x, const Variable& y) {
+    inline static bool NumberOperate(TokenType eqtype, const Variable& x, const Variable& y) {
         if (eqtype == TokenType::DoubleEqual) {
             return x.num == y.num;
         }
@@ -305,7 +305,7 @@ namespace jxcode::atomscript
         }
         return false;
     }
-    inline static bool StrptrOperate(Interpreter* inter, TokenType_t eqtype, const Variable& x, const Variable& y) {
+    inline static bool StrptrOperate(Interpreter* inter, TokenType eqtype, const Variable& x, const Variable& y) {
 
         if (eqtype == TokenType::DoubleEqual) {
             if (x.ptr == y.ptr) {
@@ -322,7 +322,7 @@ namespace jxcode::atomscript
         return false;
     }
 
-    inline static bool VariableOperate(Interpreter* inter, TokenType_t eqtype, const Variable& x, const Variable& y) {
+    inline static bool VariableOperate(Interpreter* inter, TokenType eqtype, const Variable& x, const Variable& y) {
         if (x.type != y.type) {
             return false;
         }
@@ -535,7 +535,7 @@ namespace jxcode::atomscript
             CheckValidIdent(cmd.targets[0]);
             this->DelVar(*cmd.targets[0]->value);
         }
-        else if (cmd.code == OpCode::JumpFile) {
+        else if (cmd.code == OpCode::ToProg) {
             wstring* pfilestr;
             CheckValidLength(cmd, 1);
             auto token = cmd.targets[0];
@@ -550,7 +550,7 @@ namespace jxcode::atomscript
             }
             this->ExecuteProgram(*pfilestr);
         }
-        else if (cmd.code == OpCode::ClearSubVar) {
+        else if (cmd.code == OpCode::ClearSub) {
             //清理子变量
             //子变量规则，Obj__subvar
             CheckValidLength(cmd, 1);
@@ -609,8 +609,8 @@ namespace jxcode::atomscript
         return v;
     }
 
-    static map<wstring, TokenType_t> get_atom_operator_map() {
-        map<wstring, TokenType_t> mp;
+    static map<wstring, TokenType> get_atom_operator_map() {
+        map<wstring, TokenType> mp;
         mp[L"=="] = TokenType::DoubleEqual;
         mp[L"="] = TokenType::Equal;
         mp[L"("] = TokenType::LBracket;
@@ -626,9 +626,15 @@ namespace jxcode::atomscript
         mp[L":"] = TokenType::Colon;
         mp[L","] = TokenType::Comma;
         mp[L"."] = TokenType::Dot;
-        mp[L">"] = TokenType::GreaterThan;
-        mp[L"<"] = TokenType::LessThan;
 
+        mp[L">"] = TokenType::GreaterThan;
+        mp[L">="] = TokenType::GreaterThanEqual;
+        mp[L">>"] = TokenType::DoubleGreaterThan;
+        mp[L">>>"] = TokenType::TripleGreaterThan;
+        mp[L"<"] = TokenType::LessThan;
+        mp[L"<="] = TokenType::LessThanEqual;
+        mp[L"<<"] = TokenType::DoubleLessThan;
+        mp[L"<<<"] = TokenType::TripleLessThan;
 
         mp[L"~"] = TokenType::Tilde;
         mp[L"!"] = TokenType::Exclamatory;

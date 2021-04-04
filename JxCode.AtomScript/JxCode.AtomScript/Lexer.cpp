@@ -44,7 +44,7 @@ namespace jxcode
 
         //一次性数据，悬垂了也无所谓
         wstring* code_content;
-        map<wstring, TokenType_t>* token_map;
+        map<wstring, TokenType>* token_map;
         map<wstring, wstring>* esc_char_map;
 
         inline wchar_t GetChar(int pos = cur_global_pos) {
@@ -82,7 +82,7 @@ namespace jxcode
             return !(IsSymbol(c) || IsControlSymbol(c) || IsNumber(c));
         }
 
-        inline bool IsKeyOpr(const wstring& str, TokenType_t* out_type) {
+        inline bool IsKeyOpr(const wstring& str, TokenType* out_type) {
             bool b = token_map->count(str) != 0;
             if (b) {
                 *out_type = (*token_map)[str];
@@ -168,14 +168,25 @@ namespace jxcode
         inline bool is_curc_null() {
             return GetChar() == 0;
         }
+
+        inline static bool ShouldGetNumber() {
+            wchar_t c = PeekChar(0);
+            return IsNumber(c) || (c == L'-' && IsNumber(PeekChar(1)));
+        }
+
         wstring GetNumber() {
-
-            int first = cur_global_pos;
-
             int length = 0;
             bool isDecimal = false;
 
             wchar_t c = GetChar();
+            if (c == L'-') {
+                if (!IsNumber(PeekChar(1))) {
+                    throw LexerException((size_t)cur_line + 1, (size_t)cur_position + 1, L"Number format error");
+                }
+                length++;
+                c = PeekChar(length);
+            }
+
             while (IsNumber(c) || c == L'.') {
                 if (c == L'.') {
                     if (isDecimal) {
@@ -183,11 +194,12 @@ namespace jxcode
                     }
                     isDecimal = true;
                 }
-                c = NextChar();
                 length++;
+                c = PeekChar(length);
             }
-
-            return code_content->substr(first, length);
+            int head = cur_global_pos;
+            Next(length);
+            return code_content->substr(head, length);
         }
         wstring GetString() {
 
@@ -235,11 +247,11 @@ namespace jxcode
                 appstr += c;
                 NextChar();
             }
-            
+
             NextChar(); // "
             return appstr;
         }
-        wstring GetSymbol(TokenType_t* type) {
+        wstring GetSymbol(TokenType* type) {
             vector<wstring> matchList;
             int length = 0;
             //<字符, TokenType>
@@ -353,7 +365,7 @@ namespace jxcode
                 out_token->value = make_shared<wstring>(GetNote());
                 out_token->token_type = TokenType::Note;
             }
-            else if (IsNumber(c)) {
+            else if (ShouldGetNumber()) {
                 out_token->value = make_shared<wstring>(GetNumber());
                 out_token->token_type = TokenType::Number;
             }
@@ -362,13 +374,13 @@ namespace jxcode
                 out_token->token_type = TokenType::String;
             }
             else if (IsSymbol(c)) {
-                TokenType_t type;
+                TokenType type;
                 out_token->value = make_shared<wstring>(GetSymbol(&type));
                 out_token->token_type = (type);
             }
             else if (IsWord(c)) {
                 wstring str = GetIdent();
-                TokenType_t type;
+                TokenType type;
                 out_token->value = make_shared<wstring>(str);
                 if (IsKeyOpr(str, &type)) {
                     out_token->token_type = type;
@@ -383,7 +395,7 @@ namespace jxcode
         }
         std::vector<shared_ptr<Token>> Scanner(
             wstring* code,
-            map<wstring, TokenType_t>* tokenList,
+            map<wstring, TokenType>* tokenList,
             std::map<std::wstring, std::wstring>* escMap
         ) {
             Reset();
@@ -397,7 +409,7 @@ namespace jxcode
 
             NextChar();
             while (GetToken(&token)) {
-                TokenType_t type = token.token_type;
+                TokenType type = token.token_type;
                 if (type == TokenType::Note && !scan_is_parse_note) {
                     continue;
                 }
@@ -410,8 +422,8 @@ namespace jxcode
         }
 
 
-        map<wstring, TokenType_t> get_std_operator_map() {
-            map<wstring, TokenType_t> mp;
+        map<wstring, TokenType> get_std_operator_map() {
+            map<wstring, TokenType> mp;
             mp[L"=="] = TokenType::DoubleEqual;
             mp[L"!="] = TokenType::ExclamatoryAndEqual;
             mp[L"="] = TokenType::Equal;
@@ -425,15 +437,20 @@ namespace jxcode
             mp[L"/"] = TokenType::Division;
             mp[L","] = TokenType::Comma;
             mp[L"."] = TokenType::Dot;
+
             mp[L">"] = TokenType::GreaterThan;
+            mp[L">="] = TokenType::GreaterThanEqual;
+
             mp[L"<"] = TokenType::LessThan;
+            mp[L"<="] = TokenType::LessThanEqual;
+
 
             mp[L"!"] = TokenType::Exclamatory;
             return mp;
         }
 
-        map<wstring, TokenType_t> get_nep_operator_map() {
-            map<wstring, TokenType_t> mp;
+        map<wstring, TokenType> get_nep_operator_map() {
+            map<wstring, TokenType> mp;
             return mp;
         }
         map<wstring, wstring> get_std_esc_char_map() {

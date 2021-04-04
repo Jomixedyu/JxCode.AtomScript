@@ -33,11 +33,11 @@ namespace jxcode
 
         std::vector<std::shared_ptr<Token>> Scanner(
             std::wstring* code,
-            std::map<std::wstring, TokenType_t>* tokenList,
+            std::map<std::wstring, TokenType>* tokenList,
             std::map<std::wstring, std::wstring>* escMap
         );
 
-        std::map<std::wstring, TokenType_t> get_std_operator_map();
+        std::map<std::wstring, TokenType> get_std_operator_map();
         std::map<std::wstring, std::wstring> get_std_esc_char_map();
     }
 }

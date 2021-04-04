@@ -8,22 +8,10 @@ namespace jxcode::atomscript
     using namespace std;
     using namespace lexer;
 
-    namespace OpCode
-    {
-        OpCode_t Unknow = L"Unknow";
-        OpCode_t Call = L"call";
-        OpCode_t Label = L"label";
-        OpCode_t Goto = L"goto";
-        OpCode_t If = L"if";
-        OpCode_t Set = L"set";
-        OpCode_t Del = L"del";
-        OpCode_t ClearSubVar = L"clear";
-        OpCode_t JumpFile = L"jumpfile";
-    }
     OpCommand::OpCommand() : code(OpCode::Unknow), op_token(nullptr), targets(vector<shared_ptr<Token>>()) {
 
     }
-    OpCommand::OpCommand(const OpCode_t& code, const shared_ptr<Token>& optoken, const vector<shared_ptr<Token>>& targets)
+    OpCommand::OpCommand(const OpCode& code, const shared_ptr<Token>& optoken, const vector<shared_ptr<Token>>& targets)
         : code(code), op_token(optoken), targets(targets)
     {
 
@@ -97,7 +85,7 @@ namespace jxcode::atomscript
         AssertAfterLength(count, count);
     }
 
-    inline static bool CheckValidPeek(int i, TokenType_t type)
+    inline static bool CheckValidPeek(int i, TokenType type)
     {
         auto p = Peek(i);
         if (p == nullptr) {
@@ -146,14 +134,14 @@ namespace jxcode::atomscript
 
         using namespace jxcode::lexer;
 
-        static wstring opcode_call = OpCode::Call;
-        static wstring opcode_goto = OpCode::Goto;
-        static wstring opcode_if = OpCode::If;
-        static wstring opcode_set = OpCode::Set;
-        static wstring opcode_clear = OpCode::ClearSubVar;
-        static wstring opcode_del = OpCode::Del;
-        static wstring opcode_jumpfile = OpCode::JumpFile;
-        static wstring opcode_label = OpCode::Label;
+        static wstring opcode_call = L"call";
+        static wstring opcode_goto = L"goto";
+        static wstring opcode_if = L"if";
+        static wstring opcode_set = L"set";
+        static wstring opcode_clear = L"clearsub";
+        static wstring opcode_del = L"del";
+        static wstring opcode_jumpfile = L"toprog";
+        static wstring opcode_label = L"label";
 
         shared_ptr<vector<OpCommand>> list = std::make_shared<vector<OpCommand>>();
 
@@ -175,8 +163,8 @@ namespace jxcode::atomscript
                 AddRangeToLF(&cmd.targets);
                 NextToken(); //ÍÌ»»ÐÐ·û
             }
-            else if (*token->value == opcode_goto || token->token_type == TokenType::SingleArrow) {
-                // goto ->
+            else if (*token->value == opcode_goto || token->token_type == TokenType::DoubleGreaterThan) {
+                // goto >>
                 NextToken();
                 AssertAfterLength(1, 2);
                 static wstring _var = L"var";
@@ -225,7 +213,7 @@ namespace jxcode::atomscript
                 ThrowParameterException(
                     (CheckValidPeek(1, TokenType::Ident))
                 );
-                cmd.code = OpCode::ClearSubVar;
+                cmd.code = OpCode::ClearSub;
                 cmd.targets.push_back(NextToken());
             }
             else if (*token->value == opcode_del || token->token_type == TokenType::Division) {
@@ -238,11 +226,11 @@ namespace jxcode::atomscript
                 cmd.code = OpCode::Del;
                 cmd.targets.push_back(NextToken());
             }
-            else if (*token->value == opcode_jumpfile || token->token_type == TokenType::DoubleArrow) {
-                // jumpfile =>
+            else if (*token->value == opcode_jumpfile || token->token_type == TokenType::TripleGreaterThan) {
+                // jumpfile >>>
                 NextToken();
                 AssertAfterLength(1);
-                cmd.code = OpCode::JumpFile;
+                cmd.code = OpCode::ToProg;
                 cmd.targets.push_back(NextToken());
             }
             else if (*token->value == opcode_label || token->token_type == TokenType::DoubleColon) {
@@ -267,7 +255,7 @@ namespace jxcode::atomscript
     {
         wstringstream ss;
         ss.width(8);
-        ss << code;
+        ss << (int)code;
         for (const auto& item : targets) {
             ss.width(18);
             ss << *item->value;
