@@ -102,25 +102,24 @@ public class role
 查看JxCode.AtomScript\JxCode.AtomScript目录中的DLL.h查看导出的函数
 
 
-
 ## AtomScript基础语法
 语法演示：  
 使用基础关键字
 ```
 goto IsZero__end
-::IsZero
-    if IsZero__parm1 == 0 else goto IsZero__logic1
+label IsZero
+    if IsZero__parm1 != 0 then goto IsZero__logic1
         set IsZero__return = true
         goto var IsZero__back
-    ::IsZero__logic1
+    label IsZero__logic1
         set IsZero__return = false
         goto var IsZero__back
-::IsZero__end
+label IsZero__end
 
 set IsZero__back = "IsZeroCall1"
 set IsZero__param1 = 3
 goto IsZero
-::IsZeroCall1
+label IsZeroCall1
 set ret = IsZero__return
 clear IsZero
 
@@ -131,19 +130,19 @@ call AtomLang::Sys.obj.Print: "inst helloworld"
 ```
 也可以使用符号
 ```
-->IsZero__end
+>>IsZero__end
 ::IsZero
-    ? IsZero__parm1 == 0 else->IsZero__logic1
+    ? IsZero__parm1 != 0 then >> IsZero__logic1
         $IsZero__return = true
-        ->var IsZero__back
+        >>var IsZero__back
     ::IsZero__logic1
         $IsZero__return = false
-        ->var IsZero__back
+        >>var IsZero__back
 ::IsZero__end
 
 $IsZero__back = "IsZeroCall1"
 $IsZero__param1 = 3
-->IsZero
+>>IsZero
 ::IsZeroCall1
 $ret = IsZero__return
 ~IsZero
@@ -157,7 +156,7 @@ $ret = IsZero__return
 ### 执行一个文件
 ```jumpfile "atomscript"```   
 符号  
-```=>"atomscript"```
+```>>>"atomscript"```
 
 ### 设置一个变量
 ```set a = "helloworld"```  
@@ -177,7 +176,7 @@ $ret = IsZero__return
 ### 跳到一个标签  
 ```goto start```  
 符号  
-```->start```  
+```>>start```  
 
 ### 跳转至变量中的标签
 ```
@@ -187,7 +186,7 @@ goto var target
 符号  
 ```
 $target = "start"
--> var target
+>> var target
 ```
 
 ### 清除所有子变量
@@ -206,4 +205,4 @@ $target = "start"
 如果表达式运算成立，则执行后面的语句，否则继续向下执行
 ```if a == 0 then goto start```  
 符号  
-```? a == 0 then -> start```
+```? a == 0 then >> start```
