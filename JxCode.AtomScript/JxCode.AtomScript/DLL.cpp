@@ -252,6 +252,26 @@ int CALLAPI Next(int id)
     return kSuccess;
 }
 
+int CALLAPI Goto(int id, const wchar_t* label)
+{
+    auto inter = CheckAndGetState(id);
+    if (inter == nullptr) {
+        return kNullResult;
+    }
+    try {
+        inter->interpreter->GotoLabel(label);
+    } 
+    catch (wexceptionbase& e) {
+        SetErrorMessage(id, e.what().c_str());
+        return kErrorMsg;
+    }
+    catch (const exception& e) {
+        SetErrorMessage(id, L"error");
+        return kErrorMsg;
+    }
+    return kSuccess;
+}
+
 int CALLAPI GetProgramName(int id, wchar_t* out_name)
 {
     auto inter = CheckAndGetState(id);

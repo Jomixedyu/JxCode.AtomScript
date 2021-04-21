@@ -99,6 +99,8 @@ namespace jxcode::atomscript
         //返回是否运行结束
         bool Next();
 
+        void GotoLabel(const wstring& label);
+
         void ResetState();
         void ResetMemory();
 

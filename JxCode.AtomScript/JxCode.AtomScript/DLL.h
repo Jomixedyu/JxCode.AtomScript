@@ -46,6 +46,7 @@ extern "C" {
 
     DLLEXPORT int CALLAPI ExecuteProgram(int id, const wchar_t* file);
     DLLEXPORT int CALLAPI Next(int id);
+    DLLEXPORT int CALLAPI Goto(int id, const wchar_t* label);
 
     DLLEXPORT int CALLAPI GetVariable(int id, wchar_t* varname, Variable* out_var);
     DLLEXPORT int CALLAPI SetVariable(int id, wchar_t* varname, Variable var);

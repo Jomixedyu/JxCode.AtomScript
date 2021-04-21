@@ -705,6 +705,12 @@ namespace jxcode::atomscript
         return true;
     }
 
+    void Interpreter::GotoLabel(const wstring& label)
+    {
+        int32_t pos = (int32_t)this->labels_[label];
+        this->exec_ptr_ = pos;
+    }
+
     void Interpreter::ResetMemory()
     {
         this->ptr_alloc_index_ = 0;
