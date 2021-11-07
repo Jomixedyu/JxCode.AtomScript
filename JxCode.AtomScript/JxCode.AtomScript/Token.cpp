@@ -6,14 +6,13 @@ namespace jxcode::lexer
 
     std::wstring Token::to_string() const {
         std::wstringstream ss;
-        ss << L"TokenType: ";
-        ss << (int)this->token_type;
-        ss << L", Line: ";
+        ss << L"token: ";
+        ss << tokentype_mapping[this->token_type] << L"(type:" << (int)this->token_type << L")";
+        ss << L", line: ";
         ss << this->line;
-        ss << L", Position: ";
+        ss << L", pos: ";
         ss << this->position;
         ss << L", Value: " << *this->value;
-        ss << L". ";
         return ss.str();
     }
 

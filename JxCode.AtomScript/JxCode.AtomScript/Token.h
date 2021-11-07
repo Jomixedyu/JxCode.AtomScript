@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <memory>
+#include <map>
 #include "wexceptionbase.h"
 
 namespace jxcode::lexer
@@ -48,6 +49,50 @@ namespace jxcode::lexer
         Doller,
         Precent,
         Question
+    };
+    inline std::map<TokenType, std::wstring> tokentype_mapping =
+    {
+        {TokenType::Unknow, L"Unknow"},
+        {TokenType::LF, L"LF"},
+        {TokenType::Note, L"Note"},
+        {TokenType::String, L"String"},
+        {TokenType::Number, L"Number"},
+        {TokenType::Ident, L"Ident"},
+        {TokenType::True, L"True"},
+        {TokenType::False, L"False"},
+        {TokenType::Define, L"Define"},
+        {TokenType::Equal, L"Equal"},
+        {TokenType::DoubleEqual, L"DoubleEqual"},
+        {TokenType::Plus, L"Plus"},
+        {TokenType::Minus, L"Minus"},
+        {TokenType::Multiple, L"Multiple"},
+        {TokenType::Division, L"Division"},
+        {TokenType::ExclamatoryAndEqual, L"ExclamatoryAndEqual"},
+        {TokenType::And, L"And"},
+        {TokenType::Or, L"Or"},
+        {TokenType::LBracket, L"LBracket"},
+        {TokenType::RBracket, L"RBracket"},
+        {TokenType::Colon, L"Colon"},
+        {TokenType::DoubleColon, L"DoubleColon"},
+        {TokenType::Comma, L"Comma"},
+        {TokenType::Dot, L"Dot"},
+        {TokenType::GreaterThan, L"GreaterThan"},
+        {TokenType::DoubleGreaterThan, L"DoubleGreaterThan"},
+        {TokenType::TripleGreaterThan, L"TripleGreaterThan"},
+        {TokenType::GreaterThanEqual, L"GreaterThanEqual"},
+        {TokenType::LessThan, L"LessThan"},
+        {TokenType::DoubleLessThan, L"DoubleLessThan"},
+        {TokenType::TripleLessThan, L"TripleLessThan"},
+        {TokenType::LessThanEqual, L"LessThanEqual"},
+        {TokenType::SingleArrow, L"SingleArrow"},
+        {TokenType::DoubleArrow, L"DoubleArrow"},
+        {TokenType::Tilde, L"Tilde"},
+        {TokenType::Exclamatory, L"Exclamatory"},
+        {TokenType::At, L"At"},
+        {TokenType::Pound, L"Pound"},
+        {TokenType::Doller, L"Doller"},
+        {TokenType::Precent, L"Precent"},
+        {TokenType::Question, L"Question"},
     };
 
     class Token

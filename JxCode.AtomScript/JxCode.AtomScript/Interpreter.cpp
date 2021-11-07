@@ -661,7 +661,7 @@ namespace jxcode::atomscript
 
         wstring code = this->_loadfile_(program_name);
 
-        vector<shared_ptr<Token>> tokens = lexer::Scanner(&const_cast<wstring&>(code),
+        vector<shared_ptr<Token>> tokens = Lexer{}.Scanner(&const_cast<wstring&>(code),
             &get_atom_operator_map(),
             &lexer::get_std_esc_char_map()
         );
